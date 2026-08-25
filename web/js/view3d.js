@@ -1,4 +1,4 @@
-// 3D Volumetric Room & Flow Visualizer
+// 3D Volumetric Scene & Coupled CFD Convection Visualizer
 
 class View3D {
   constructor(containerId) {
@@ -8,16 +8,13 @@ class View3D {
     this.renderer = null;
     this.roomGroup = null;
     this.particleGroup = null;
-    this.sliceMesh = null;
-    this.occupantMeshes = [];
-    this.particles = [];
     this.colormapName = 'turbo';
 
     this.isOrbiting = false;
     this.isPanning = false;
     this.prevMouseX = 0;
     this.prevMouseY = 0;
-    this.cameraTarget = { x: 5.0, y: 1.5, z: 2.5 };
+    this.cameraTarget = { x: 5.0, y: 1.4, z: 2.5 };
     this.cameraDistance = 14.0;
     this.cameraPhi = Math.PI / 4;
     this.cameraTheta = Math.PI / 5;
@@ -26,9 +23,8 @@ class View3D {
   }
 
   init() {
-    // If THREE is loaded, setup scene
     if (typeof THREE === 'undefined') {
-      console.warn("Three.js not yet loaded, waiting...");
+      console.warn("Three.js not yet loaded");
       return;
     }
 
@@ -41,20 +37,20 @@ class View3D {
     this.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
     this.updateCameraPos();
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.container.appendChild(this.renderer.domElement);
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(10, 15, 10);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight.position.set(12, 18, 12);
     this.scene.add(dirLight);
 
-    const floorGrid = new THREE.GridHelper(12, 24, 0x30363d, 0x161b22);
+    const floorGrid = new THREE.GridHelper(14, 28, 0x30363d, 0x161b22);
     floorGrid.position.set(5.0, 0.0, 2.5);
     this.scene.add(floorGrid);
 
@@ -69,6 +65,7 @@ class View3D {
   }
 
   updateCameraPos() {
+    if (!this.camera) return;
     this.camera.position.x = this.cameraTarget.x + this.cameraDistance * Math.sin(this.cameraTheta) * Math.cos(this.cameraPhi);
     this.camera.position.y = this.cameraTarget.y + this.cameraDistance * Math.sin(this.cameraPhi);
     this.camera.position.z = this.cameraTarget.z + this.cameraDistance * Math.cos(this.cameraTheta) * Math.cos(this.cameraPhi);
@@ -98,7 +95,7 @@ class View3D {
         this.updateCameraPos();
       } else if (this.isPanning) {
         this.cameraTarget.x -= dx * 0.01;
-        this.cameraTarget.y += dy * 0.01;
+        this.cameraTarget.z -= dy * 0.01;
         this.updateCameraPos();
       }
     });
@@ -110,7 +107,7 @@ class View3D {
 
     el.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.cameraDistance = Math.max(4.0, Math.min(30.0, this.cameraDistance + e.deltaY * 0.015));
+      this.cameraDistance = Math.max(3.0, Math.min(30.0, this.cameraDistance + e.deltaY * 0.015));
       this.updateCameraPos();
     }, { passive: false });
 
@@ -126,154 +123,180 @@ class View3D {
     this.renderer.setSize(w, h);
   }
 
-  setupRooms(data) {
-    if (!this.scene) this.init();
-    if (!this.scene) return;
+  update3DState(sceneData) {
+    if (!this.scene || !sceneData) return;
 
-    // Clear previous geometry
+    // Clear old geometry
     while (this.roomGroup.children.length > 0) {
-      this.roomGroup.remove(this.roomGroup.children[0]);
+      const obj = this.roomGroup.children[0];
+      if (obj.geometry) obj.geometry.dispose();
+      this.roomGroup.remove(obj);
     }
 
-    const wireMat = new THREE.LineBasicMaterial({ color: 0x58a6ff, transparent: true, opacity: 0.4 });
     const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x21262d,
+      color: 0x30363d,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.35,
+      roughness: 0.6,
       side: THREE.DoubleSide
     });
 
-    // 1. Room Outer Bounds Wireframe
-    const boxGeo = new THREE.BoxGeometry(data.lx, data.ly, data.lz);
-    const edges = new THREE.EdgesGeometry(boxGeo);
-    const wireframe = new THREE.LineSegments(edges, wireMat);
-    wireframe.position.set(data.lx * 0.5, data.ly * 0.5, data.lz * 0.5);
-    this.roomGroup.add(wireframe);
+    const frameMat = new THREE.LineBasicMaterial({ color: 0x58a6ff, linewidth: 2 });
 
-    // 2. Central Partition Wall
-    const midWallGeo = new THREE.BoxGeometry(0.1, data.ly, data.lz);
-    const midWall = new THREE.Mesh(midWallGeo, wallMat);
-    midWall.position.set(data.lx * 0.5, data.ly * 0.5, data.lz * 0.5);
-    this.roomGroup.add(midWall);
+    // 1. Build 3D Walls (Extruded to 2.80 m Fixed Ceiling Height)
+    const walls = sceneData.walls || [];
+    for (const w of walls) {
+      const dx = w.x2 - w.x1;
+      const dz = w.z2 - w.z1;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 0.05) continue;
 
-    // 3. Add Windows
-    for (let w of (data.windows || [])) {
-      const b = w.box;
-      const ww = Math.max(0.1, b[1] - b[0]);
-      const wh = Math.max(0.1, b[3] - b[2]);
-      const wd = Math.max(0.1, b[5] - b[4]);
+      const h = w.height || 2.80; // Fixed 2.80m
+      const th = w.thickness || 0.20;
 
-      const winColor = w.is_inflow ? 0x39c5cf : 0xd29922; // Cyan for Kerala Inflow, Orange for Outflow
-      const winMat = new THREE.MeshStandardMaterial({
-        color: winColor,
-        transparent: true,
-        opacity: 0.75,
-        roughness: 0.2
-      });
+      const geom = new THREE.BoxGeometry(len, h, th);
+      const mesh = new THREE.Mesh(geom, wallMat);
 
-      const winMesh = new THREE.Mesh(new THREE.BoxGeometry(ww, wh, wd), winMat);
-      winMesh.position.set((b[0] + b[1]) * 0.5, (b[2] + b[3]) * 0.5, (b[4] + b[5]) * 0.5);
-      this.roomGroup.add(winMesh);
+      const mx = (w.x1 + w.x2) * 0.5;
+      const mz = (w.z1 + w.z2) * 0.5;
+      mesh.position.set(mx, h * 0.5, mz);
+      mesh.rotation.y = -Math.atan2(dz, dx);
+
+      this.roomGroup.add(mesh);
+
+      // Wireframe Outline
+      const wireGeom = new THREE.EdgesGeometry(geom);
+      const wire = new THREE.LineSegments(wireGeom, frameMat);
+      wire.position.copy(mesh.position);
+      wire.rotation.copy(mesh.rotation);
+      this.roomGroup.add(wire);
     }
 
-    // 4. Add Doors
-    for (let d of (data.doors || [])) {
-      const b = d.box;
-      const dw = Math.max(0.1, b[1] - b[0]);
-      const dh = Math.max(0.1, b[3] - b[2]);
-      const dd = Math.max(0.1, b[5] - b[4]);
+    // 2. Build 3D Windows (with Rotated Casement Glass Panes)
+    const windows = sceneData.windows || [];
+    for (const win of windows) {
+      const w = win.width || 1.50;
+      const h = win.height || 1.20;
+      const openRatio = (win.open_ratio !== undefined) ? win.open_ratio : 1.0;
+      const openAngle = openRatio * (Math.PI / 2);
 
+      // Window Frame Outline
+      const frameGeom = new THREE.BoxGeometry(w, h, 0.25);
+      const frameEdge = new THREE.EdgesGeometry(frameGeom);
+      const frameMesh = new THREE.LineSegments(frameEdge, new THREE.LineBasicMaterial({ color: 0x39c5cf, linewidth: 2 }));
+      frameMesh.position.set(win.x, win.y || 1.50, win.z);
+      this.roomGroup.add(frameMesh);
+
+      // Rotated Casement Sash Pane
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: 0x39c5cf,
+        transparent: true,
+        opacity: 0.65,
+        roughness: 0.1,
+        metalness: 0.8,
+        side: THREE.DoubleSide
+      });
+
+      const paneGeom = new THREE.BoxGeometry(w * 0.95, h * 0.95, 0.04);
+      paneGeom.translate(w * 0.45, 0, 0); // Pivot at hinge edge
+      const paneMesh = new THREE.Mesh(paneGeom, glassMat);
+      paneMesh.position.set(win.x - w * 0.45, win.y || 1.50, win.z);
+      paneMesh.rotation.y = openAngle;
+      this.roomGroup.add(paneMesh);
+    }
+
+    // 3. Build 3D Doors (with Rotated Wooden Door Leaf)
+    const doors = sceneData.doors || [];
+    for (const dor of doors) {
+      const w = dor.width || 1.00;
+      const h = dor.height || 2.10;
+      const openRatio = (dor.open_ratio !== undefined) ? dor.open_ratio : 1.0;
+      const openAngle = openRatio * (Math.PI / 2);
+
+      // Door Frame
+      const frameGeom = new THREE.BoxGeometry(w, h, 0.25);
+      const frameEdge = new THREE.EdgesGeometry(frameGeom);
+      const frameMesh = new THREE.LineSegments(frameEdge, new THREE.LineBasicMaterial({ color: 0xbc8cff, linewidth: 2 }));
+      frameMesh.position.set(dor.x, h * 0.5, dor.z);
+      this.roomGroup.add(frameMesh);
+
+      // Rotated Door Leaf
       const doorMat = new THREE.MeshStandardMaterial({
-        color: 0x3fb950,
-        transparent: true,
-        opacity: 0.55
+        color: 0x8b5cf6,
+        roughness: 0.4,
+        side: THREE.DoubleSide
       });
-
-      const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(dw, dh, dd), doorMat);
-      doorMesh.position.set((b[0] + b[1]) * 0.5, (b[2] + b[3]) * 0.5, (b[4] + b[5]) * 0.5);
-      this.roomGroup.add(doorMesh);
+      const leafGeom = new THREE.BoxGeometry(w * 0.95, h * 0.95, 0.05);
+      leafGeom.translate(w * 0.45, 0, 0); // Pivot at hinge
+      const leafMesh = new THREE.Mesh(leafGeom, doorMat);
+      leafMesh.position.set(dor.x - w * 0.45, h * 0.5, dor.z);
+      leafMesh.rotation.y = openAngle;
+      this.roomGroup.add(leafMesh);
     }
 
-    // 5. Add Human Occupants (Hot Bodies @ 37°C)
-    for (let occ of (data.occupants || [])) {
-      const b = occ.box;
-      const occGroup = new THREE.Group();
-
-      // Body torso
-      const bodyMat = new THREE.MeshStandardMaterial({
+    // 4. Build 6-Foot Human Mannequins (Height = 1.83 m @ 37.0 °C)
+    const occupants = sceneData.occupants || [];
+    for (const occ of occupants) {
+      const hTotal = occ.height || 1.83; // 6 feet
+      const occMat = new THREE.MeshStandardMaterial({
         color: 0xf85149,
-        emissive: 0x7a1e1e,
+        emissive: 0xaa2211,
         roughness: 0.3
       });
 
-      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.0, 16), bodyMat);
-      torso.position.set(0, 0.9, 0);
-      occGroup.add(torso);
+      // Torso Cylinder (1.4m height)
+      const torsoGeom = new THREE.CylinderGeometry(0.20, 0.16, hTotal * 0.75, 16);
+      const torso = new THREE.Mesh(torsoGeom, occMat);
+      torso.position.set(occ.x, hTotal * 0.38, occ.z);
+      this.roomGroup.add(torso);
 
-      // Head
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), bodyMat);
-      head.position.set(0, 1.55, 0);
-      occGroup.add(head);
-
-      // Position in room
-      const cx = (b[0] + b[1]) * 0.5;
-      const cz = (b[4] + b[5]) * 0.5;
-      occGroup.position.set(cx, 0, cz);
-
-      this.roomGroup.add(occGroup);
+      // Head Sphere (at top of 6ft height)
+      const headGeom = new THREE.SphereGeometry(0.13, 16, 16);
+      const head = new THREE.Mesh(headGeom, occMat);
+      head.position.set(occ.x, hTotal * 0.88, occ.z);
+      this.roomGroup.add(head);
     }
-  }
 
-  update3DState(data) {
-    if (!this.scene) return;
-
-    // Refresh room geometry and aperture meshes if data changes
-    this.setupRooms(data);
-
-    // Update 3D Flow Particles / Streamlines
+    // 5. Build 3D Streamline Flow Particles
     while (this.particleGroup.children.length > 0) {
-      this.particleGroup.remove(this.particleGroup.children[0]);
+      const p = this.particleGroup.children[0];
+      if (p.geometry) p.geometry.dispose();
+      this.particleGroup.remove(p);
     }
 
-    if (data.particles && data.particles.length > 0) {
-      const geom = new THREE.BufferGeometry();
-      const positions = [];
-      const colors = [];
+    const particles = sceneData.particles || [];
+    if (particles.length > 0) {
+      const posArr = new Float32Array(particles.length * 3);
+      const colArr = new Float32Array(particles.length * 3);
 
-      for (let p of data.particles) {
-        // [x, y, z, u, v, w, t]
-        const px = p[0], py = p[1], pz = p[2];
-        const u = p[3], v = p[4], w = p[5];
-        const temp = p[6];
+      for (let i = 0; i < particles.length; ++i) {
+        const pt = particles[i]; // [x, y, z, u, v, w, t]
+        posArr[i * 3] = pt[0];
+        posArr[i * 3 + 1] = pt[1];
+        posArr[i * 3 + 2] = pt[2];
 
-        const speed = Math.sqrt(u * u + v * v + w * w);
-        const len = Math.min(0.6, speed * 0.3);
-
-        if (speed > 0.01) {
-          positions.push(px, py, pz);
-          positions.push(px + (u / speed) * len, py + (v / speed) * len, pz + (w / speed) * len);
-
-          const normT = Math.min(1.0, Math.max(0.0, (temp - 32.0) / 5.0));
-          const rgb = Colormaps.getColor(this.colormapName, normT);
-          const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-
-          colors.push(r, g, b);
-          colors.push(r, g, b);
-        }
+        const temp = pt[6];
+        const minT = this.minTemp || 30.0;
+        const maxT = this.maxTemp || 37.0;
+        const rgb = Colormaps.getColor(this.colormapName, temp, minT, maxT);
+        colArr[i * 3] = rgb[0] / 255;
+        colArr[i * 3 + 1] = rgb[1] / 255;
+        colArr[i * 3 + 2] = rgb[2] / 255;
       }
 
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      const pGeom = new THREE.BufferGeometry();
+      pGeom.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      pGeom.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
 
-      const lineMat = new THREE.LineBasicMaterial({
+      const pMat = new THREE.PointsMaterial({
+        size: 0.12,
         vertexColors: true,
-        linewidth: 2,
         transparent: true,
-        opacity: 0.85
+        opacity: 0.9
       });
 
-      const lineSegments = new THREE.LineSegments(geom, lineMat);
-      this.particleGroup.add(lineSegments);
+      const pSys = new THREE.Points(pGeom, pMat);
+      this.particleGroup.add(pSys);
     }
   }
 

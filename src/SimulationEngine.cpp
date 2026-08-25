@@ -7,7 +7,7 @@
 
 namespace cfd {
 
-SimulationEngine::SimulationEngine(const SimulationConfig& cfg, const ClimateConfig& clim_cfg)
+SimulationEngine::SimulationEngine(const SimulationConfig& cfg, const EnvironmentConfig& clim_cfg)
     : config(cfg),
       climate(clim_cfg),
       geometry(cfg.lx, cfg.ly, cfg.lz),
@@ -23,9 +23,15 @@ SimulationEngine::SimulationEngine(const SimulationConfig& cfg, const ClimateCon
 void SimulationEngine::reset() {
     grid.reset();
     geometry.rasterize_to_grid(grid, climate);
+    grid.compute_wall_distances();
     stats.current_time = 0.0;
     stats.step_count = 0;
     update_statistics();
+}
+
+void SimulationEngine::sync_geometry_to_grid() {
+    geometry.rasterize_to_grid(grid, climate);
+    grid.compute_wall_distances();
 }
 
 double SimulationEngine::compute_adaptive_dt() const {
@@ -105,6 +111,7 @@ void SimulationEngine::step_multi(int n_substeps) {
 
     auto t_end = std::chrono::high_resolution_clock::now();
     stats.computation_time_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
     update_statistics();
 }
 
@@ -116,46 +123,50 @@ void SimulationEngine::run_steps(int count) {
 
 void SimulationEngine::update_statistics() {
     double max_v = 0.0;
+    double sum_t = 0.0;
     double min_t = 1e9;
     double max_t = -1e9;
-    double sum_t = 0.0;
-    int fluid_count = 0;
-    double max_div = 0.0;
+    size_t fluid_cells = 0;
 
     int nx = grid.nx, ny = grid.ny, nz = grid.nz;
 
     for (int i = 0; i < nx; ++i) {
-        int iny = i * ny;
         for (int j = 0; j < ny; ++j) {
-            int base = (iny + j) * nz;
             for (int k = 0; k < nz; ++k) {
-                size_t c_idx = base + k;
-                if (grid.cell_type[c_idx] == CELL_SOLID_WALL) continue;
-
-                double temp = grid.T[c_idx];
-                if (temp < min_t) min_t = temp;
-                if (temp > max_t) max_t = temp;
-                sum_t += temp;
-                fluid_count++;
+                if (grid.is_solid(i, j, k)) continue;
 
                 Vec3 v = grid.get_velocity_at_cell(i, j, k);
                 double speed = v.norm();
                 if (speed > max_v) max_v = speed;
 
-                double d = std::abs(grid.div[c_idx]);
-                if (d > max_div) max_div = d;
+                double temp = grid.T[grid.idx_cell(i, j, k)];
+                sum_t += temp;
+                if (temp < min_t) min_t = temp;
+                if (temp > max_t) max_t = temp;
+                fluid_cells++;
             }
         }
     }
 
     stats.max_velocity = max_v;
-    stats.min_temperature = (fluid_count > 0) ? min_t : 32.0;
-    stats.max_temperature = (fluid_count > 0) ? max_t : 37.0;
-    stats.avg_temperature = (fluid_count > 0) ? (sum_t / fluid_count) : 32.0;
+    stats.avg_temperature = (fluid_cells > 0) ? (sum_t / fluid_cells) : climate.config.outdoor_temp;
+    stats.min_temperature = (fluid_cells > 0) ? min_t : climate.config.outdoor_temp;
+    stats.max_temperature = (fluid_cells > 0) ? max_t : 37.0;
+
+    double max_div = 0.0;
+    for (int i = 1; i < nx - 1; ++i) {
+        for (int j = 1; j < ny - 1; ++j) {
+            for (int k = 1; k < nz - 1; ++k) {
+                if (grid.is_solid(i, j, k)) continue;
+                double div = grid.divergence(i, j, k);
+                if (div > max_div) max_div = div;
+            }
+        }
+    }
     stats.max_divergence = max_div;
-    stats.is_paused = is_paused.load();
 }
 
+// Dynamic Environmental Setters
 void SimulationEngine::set_wind_speed(double speed) {
     climate.config.wind_speed_ref = std::max(0.0, speed);
 }
@@ -168,34 +179,6 @@ void SimulationEngine::set_outdoor_temp(double temp_c) {
     climate.config.outdoor_temp = temp_c;
 }
 
-void SimulationEngine::set_human_temp(int room_idx, double temp_c) {
-    if (room_idx >= 0 && static_cast<size_t>(room_idx) < geometry.occupants.size()) {
-        geometry.set_occupant_temp(room_idx, temp_c);
-    }
-}
-
-void SimulationEngine::set_window_state(size_t window_idx, double open_ratio) {
-    geometry.set_window_open(window_idx, open_ratio);
-    geometry.rasterize_to_grid(grid, climate);
-}
-
-void SimulationEngine::set_door_state(size_t door_idx, double open_ratio) {
-    geometry.set_door_open(door_idx, open_ratio);
-    geometry.rasterize_to_grid(grid, climate);
-}
-
-void SimulationEngine::move_window(size_t window_idx, double center_x, double center_z) {
-    geometry.move_window(window_idx, center_x, center_z);
-    geometry.rasterize_to_grid(grid, climate);
-    grid.compute_wall_distances();
-}
-
-void SimulationEngine::move_door(size_t door_idx, double center_x, double center_z) {
-    geometry.move_door(door_idx, center_x, center_z);
-    geometry.rasterize_to_grid(grid, climate);
-    grid.compute_wall_distances();
-}
-
 void SimulationEngine::set_paused(bool paused) {
     is_paused.store(paused);
     stats.is_paused = paused;
@@ -205,6 +188,122 @@ void SimulationEngine::set_substeps(int steps) {
     sub_steps = std::clamp(steps, 1, 16);
 }
 
+// --- Dynamic CAD Geometry Operations ---
+std::string SimulationEngine::get_design_json() const {
+    return geometry.export_to_json();
+}
+
+bool SimulationEngine::load_design_json(const std::string& json_str) {
+    bool ok = geometry.import_from_json(json_str);
+    if (ok) {
+        sync_geometry_to_grid();
+    }
+    return ok;
+}
+
+int SimulationEngine::add_wall(double x1, double z1, double x2, double z2, double thickness) {
+    int id = geometry.add_wall(x1, z1, x2, z2, thickness, true);
+    sync_geometry_to_grid();
+    return id;
+}
+
+bool SimulationEngine::delete_wall(int id) {
+    bool ok = geometry.delete_wall(id);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::move_wall(int id, double x1, double z1, double x2, double z2) {
+    bool ok = geometry.move_wall(id, x1, z1, x2, z2);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+int SimulationEngine::add_window(double x, double y, double z, double width, double height, Vec3 normal, double open_ratio) {
+    int id = geometry.add_window(x, y, z, width, height, normal, open_ratio);
+    sync_geometry_to_grid();
+    return id;
+}
+
+bool SimulationEngine::delete_window(int id) {
+    bool ok = geometry.delete_window(id);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::move_window_3d(int id, double x, double y, double z) {
+    bool ok = geometry.move_window_3d(id, x, y, z);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::resize_window(int id, double width, double height) {
+    bool ok = geometry.resize_window(id, width, height);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::set_window_state(int id, double open_ratio) {
+    bool ok = geometry.set_window_open(id, open_ratio);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+int SimulationEngine::add_door(double x, double z, double width, double height, Vec3 normal, double open_ratio, bool is_connecting) {
+    int id = geometry.add_door(x, z, width, height, normal, open_ratio, is_connecting);
+    sync_geometry_to_grid();
+    return id;
+}
+
+bool SimulationEngine::delete_door(int id) {
+    bool ok = geometry.delete_door(id);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::move_door(int id, double x, double z) {
+    bool ok = geometry.move_door(id, x, z);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::resize_door(int id, double width, double height) {
+    bool ok = geometry.resize_door(id, width, height);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::set_door_state(int id, double open_ratio) {
+    bool ok = geometry.set_door_open(id, open_ratio);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+int SimulationEngine::add_occupant(double x, double z, double temp_c) {
+    int id = geometry.add_occupant(x, z, temp_c);
+    sync_geometry_to_grid();
+    return id;
+}
+
+bool SimulationEngine::delete_occupant(int id) {
+    bool ok = geometry.delete_occupant(id);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::move_occupant(int id, double x, double z) {
+    bool ok = geometry.move_occupant(id, x, z);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+bool SimulationEngine::set_human_temp(int id, double temp_c) {
+    bool ok = geometry.set_occupant_temp(id, temp_c);
+    if (ok) sync_geometry_to_grid();
+    return ok;
+}
+
+// Probes & Serialization
 ProbeData SimulationEngine::query_probe(double x, double y, double z) const {
     return grid.query_probe(x, y, z);
 }
@@ -226,7 +325,6 @@ std::string SimulationEngine::get_probe_json(double x, double y, double z) const
        << "\"w\":" << p.w << ","
        << "\"speed\":" << p.speed << ","
        << "\"pressure\":" << p.pressure << ","
-       << "\"eddy_viscosity\":" << p.eddy_viscosity << ","
        << "\"cell_type\":" << static_cast<int>(p.cell_type)
        << "}";
     return ss.str();
@@ -245,8 +343,8 @@ std::string SimulationEngine::get_stats_json() const {
        << "\"max_temp\":" << stats.max_temperature << ","
        << "\"max_divergence\":" << stats.max_divergence << ","
        << "\"compute_time_ms\":" << stats.computation_time_ms << ","
-       << "\"sub_steps\":" << sub_steps << ","
        << "\"is_paused\":" << (stats.is_paused ? "true" : "false") << ","
+       << "\"sub_steps\":" << sub_steps << ","
        << "\"wind_speed\":" << climate.config.wind_speed_ref << ","
        << "\"wind_angle\":" << climate.config.wind_angle_deg << ","
        << "\"outdoor_temp\":" << climate.config.outdoor_temp
@@ -258,14 +356,12 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
     std::ostringstream ss;
     ss << std::fixed << std::setprecision(2);
 
-    if (axis == 1) { // Y slice (Top-down floor plan)
+    if (axis == 1) { // Y-slice (Planar Top-Down Floor Plan)
         int j = std::clamp(index, 0, grid.ny - 1);
-        double slice_y = grid.cell_y(j);
-
         ss << "{"
            << "\"axis\":1,"
            << "\"index\":" << j << ","
-           << "\"coord_val\":" << slice_y << ","
+           << "\"coord_val\":" << grid.cell_y(j) << ","
            << "\"dim1_name\":\"X\","
            << "\"dim2_name\":\"Z\","
            << "\"n1\":" << grid.nx << ","
@@ -276,14 +372,14 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
 
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 ss << grid.T[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"u\":[";
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.x;
             }
@@ -291,15 +387,15 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"v\":[";
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
-                ss << vel.z;
+                ss << vel.z; // Flow along Z (vertical in screen)
             }
         }
         ss << "],\"speed\":[";
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.norm();
             }
@@ -307,26 +403,24 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"pressure\":[";
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 ss << grid.p[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"cell_type\":[";
         for (int k = 0; k < grid.nz; ++k) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || k > 0) ss << ",";
+                if (k > 0 || i > 0) ss << ",";
                 ss << static_cast<int>(grid.cell_type[grid.idx_cell(i, j, k)]);
             }
         }
         ss << "]}";
-    } else if (axis == 2) { // Z slice
+    } else if (axis == 2) { // Z-slice (Front View XxY)
         int k = std::clamp(index, 0, grid.nz - 1);
-        double slice_z = grid.cell_z(k);
-
         ss << "{"
            << "\"axis\":2,"
            << "\"index\":" << k << ","
-           << "\"coord_val\":" << slice_z << ","
+           << "\"coord_val\":" << grid.cell_z(k) << ","
            << "\"dim1_name\":\"X\","
            << "\"dim2_name\":\"Y\","
            << "\"n1\":" << grid.nx << ","
@@ -337,14 +431,14 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
 
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 ss << grid.T[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"u\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.x;
             }
@@ -352,7 +446,7 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"v\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.y;
             }
@@ -360,7 +454,7 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"speed\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.norm();
             }
@@ -368,26 +462,24 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"pressure\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 ss << grid.p[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"cell_type\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int i = 0; i < grid.nx; ++i) {
-                if (i > 0 || j > 0) ss << ",";
+                if (j > 0 || i > 0) ss << ",";
                 ss << static_cast<int>(grid.cell_type[grid.idx_cell(i, j, k)]);
             }
         }
         ss << "]}";
-    } else { // X slice
+    } else { // X-slice (Side View YxZ)
         int i = std::clamp(index, 0, grid.nx - 1);
-        double slice_x = grid.cell_x(i);
-
         ss << "{"
            << "\"axis\":0,"
            << "\"index\":" << i << ","
-           << "\"coord_val\":" << slice_x << ","
+           << "\"coord_val\":" << grid.cell_x(i) << ","
            << "\"dim1_name\":\"Z\","
            << "\"dim2_name\":\"Y\","
            << "\"n1\":" << grid.nz << ","
@@ -398,14 +490,14 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
 
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 ss << grid.T[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"u\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.z;
             }
@@ -413,7 +505,7 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"v\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.y;
             }
@@ -421,7 +513,7 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"speed\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 Vec3 vel = grid.get_velocity_at_cell(i, j, k);
                 ss << vel.norm();
             }
@@ -429,14 +521,14 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
         ss << "],\"pressure\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 ss << grid.p[grid.idx_cell(i, j, k)];
             }
         }
         ss << "],\"cell_type\":[";
         for (int j = 0; j < grid.ny; ++j) {
             for (int k = 0; k < grid.nz; ++k) {
-                if (k > 0 || j > 0) ss << ",";
+                if (j > 0 || k > 0) ss << ",";
                 ss << static_cast<int>(grid.cell_type[grid.idx_cell(i, j, k)]);
             }
         }
@@ -448,7 +540,7 @@ std::string SimulationEngine::get_slice_json(int axis, int index) const {
 
 std::string SimulationEngine::get_3d_state_json() const {
     std::ostringstream ss;
-    ss << std::fixed << std::setprecision(2);
+    ss << std::fixed << std::setprecision(3);
 
     ss << "{"
        << "\"nx\":" << grid.nx << ","
@@ -457,53 +549,73 @@ std::string SimulationEngine::get_3d_state_json() const {
        << "\"lx\":" << grid.lx << ","
        << "\"ly\":" << grid.ly << ","
        << "\"lz\":" << grid.lz << ","
-       << "\"rooms\":[";
+       << "\"walls\":[";
 
-    for (size_t r = 0; r < geometry.rooms.size(); ++r) {
-        const auto& rm = geometry.rooms[r];
-        if (r > 0) ss << ",";
-        ss << "{\"id\":" << rm.id
-           << ",\"name\":\"" << rm.name << "\""
-           << ",\"box\":[" << rm.bounds.x_min << "," << rm.bounds.x_max << ","
-           << rm.bounds.y_min << "," << rm.bounds.y_max << ","
-           << rm.bounds.z_min << "," << rm.bounds.z_max << "]}";
+    for (size_t w = 0; w < geometry.walls.size(); ++w) {
+        const auto& wl = geometry.walls[w];
+        if (w > 0) ss << ",";
+        ss << "{\"id\":" << wl.id
+           << ",\"name\":\"" << wl.name << "\""
+           << ",\"x1\":" << wl.x1 << ",\"z1\":" << wl.z1
+           << ",\"x2\":" << wl.x2 << ",\"z2\":" << wl.z2
+           << ",\"thickness\":" << wl.thickness
+           << ",\"height\":" << wl.height
+           << ",\"is_exterior\":" << (wl.is_exterior ? "true" : "false") << "}";
     }
 
     ss << "],\"windows\":[";
     for (size_t w = 0; w < geometry.windows.size(); ++w) {
         const auto& win = geometry.windows[w];
         if (w > 0) ss << ",";
-        ss << "{\"name\":\"" << win.name << "\""
+        AABB b = win.get_box();
+        ss << "{\"id\":" << win.id
+           << ",\"name\":\"" << win.name << "\""
            << ",\"room_id\":" << win.room_id
+           << ",\"x\":" << win.x << ",\"y\":" << win.y << ",\"z\":" << win.z
+           << ",\"width\":" << win.width << ",\"height\":" << win.height
+           << ",\"normal\":[" << win.normal.x << "," << win.normal.y << "," << win.normal.z << "]"
            << ",\"is_inflow\":" << (win.is_inflow ? "true" : "false")
            << ",\"open_ratio\":" << win.open_ratio
-           << ",\"box\":[" << win.box.x_min << "," << win.box.x_max << ","
-           << win.box.y_min << "," << win.box.y_max << ","
-           << win.box.z_min << "," << win.box.z_max << "]}";
+           << ",\"open_angle_deg\":" << (win.open_ratio * 90.0)
+           << ",\"box\":[" << b.x_min << "," << b.x_max << ","
+           << b.y_min << "," << b.y_max << ","
+           << b.z_min << "," << b.z_max << "]}";
     }
 
     ss << "],\"doors\":[";
     for (size_t d = 0; d < geometry.doors.size(); ++d) {
         const auto& dor = geometry.doors[d];
         if (d > 0) ss << ",";
-        ss << "{\"name\":\"" << dor.name << "\""
+        AABB b = dor.get_box();
+        ss << "{\"id\":" << dor.id
+           << ",\"name\":\"" << dor.name << "\""
            << ",\"room_id\":" << dor.room_id
+           << ",\"x\":" << dor.x << ",\"y\":" << dor.y << ",\"z\":" << dor.z
+           << ",\"width\":" << dor.width << ",\"height\":" << dor.height
            << ",\"open_ratio\":" << dor.open_ratio
-           << ",\"box\":[" << dor.box.x_min << "," << dor.box.x_max << ","
-           << dor.box.y_min << "," << dor.box.y_max << ","
-           << dor.box.z_min << "," << dor.box.z_max << "]}";
+           << ",\"open_angle_deg\":" << (dor.open_ratio * 90.0)
+           << ",\"is_connecting\":" << (dor.is_connecting ? "true" : "false")
+           << ",\"box\":[" << b.x_min << "," << b.x_max << ","
+           << b.y_min << "," << b.y_max << ","
+           << b.z_min << "," << b.z_max << "]}";
     }
 
     ss << "],\"occupants\":[";
     for (size_t o = 0; o < geometry.occupants.size(); ++o) {
         const auto& occ = geometry.occupants[o];
         if (o > 0) ss << ",";
-        ss << "{\"name\":\"" << occ.name << "\""
+        AABB b = occ.get_box();
+        ss << "{\"id\":" << occ.id
+           << ",\"name\":\"" << occ.name << "\""
            << ",\"room_id\":" << occ.room_id
+           << ",\"x\":" << occ.x << ",\"z\":" << occ.z
+           << ",\"height\":" << occ.height
+           << ",\"width\":" << occ.width
+           << ",\"depth\":" << occ.depth
            << ",\"temperature\":" << occ.temperature
-           << ",\"box\":[" << occ.box.x_min << "," << occ.box.x_max << ","
-           << occ.box.y_min << "," << occ.box.y_max << ","
-           << occ.box.z_min << "," << occ.box.z_max << "]}";
+           << ",\"box\":[" << b.x_min << "," << b.x_max << ","
+           << b.y_min << "," << b.y_max << ","
+           << b.z_min << "," << b.z_max << "]}";
     }
 
     ss << "],\"particles\":[";

@@ -23,21 +23,21 @@ enum CellType : uint8_t {
     CELL_HOT_BODY = 5
 };
 
-// Physical Properties of Tropical Humid Air (Kerala, South India)
+// Physical Properties of Air and Thermal Thermodynamics
 struct PhysicalProperties {
     // Ambient reference conditions
-    double T_ambient = 32.0;       // °C (305.15 K)
-    double T_ambient_K = 305.15;   // Kelvin
+    double T_ambient = 30.0;       // °C (303.15 K)
+    double T_ambient_K = 303.15;   // Kelvin
     double T_hot_body = 37.0;      // °C (310.15 K - Human core/skin temperature)
     double T_hot_body_K = 310.15;  // Kelvin
 
-    // Thermodynamic properties of air
-    double rho_0 = 1.164;          // Reference density at 32°C [kg/m^3]
+    // Thermodynamic properties of air at standard atmospheric conditions
+    double rho_0 = 1.164;          // Reference density [kg/m^3]
     double nu = 1.615e-5;          // Kinematic viscosity [m^2/s]
     double alpha = 2.250e-5;       // Thermal diffusivity [m^2/s]
     double Cp = 1007.0;            // Specific heat capacity at constant pressure [J/(kg·K)]
     double k_air = 0.0263;         // Thermal conductivity [W/(m·K)]
-    double beta = 1.0 / 305.15;    // Volumetric thermal expansion coefficient (1/T_ref) [1/K]
+    double beta = 1.0 / 303.15;    // Volumetric thermal expansion coefficient (1/T_ref) [1/K]
     double g = 9.81;               // Gravitational acceleration [m/s^2]
     double Pr = 0.71;              // Prandtl number (nu / alpha)
     double Pr_t = 0.85;            // Turbulent Prandtl number
@@ -47,25 +47,27 @@ struct PhysicalProperties {
     double von_karman = 0.41;      // von Kármán constant for wall damping
 };
 
-// Kerala Climatic Wind & Weather Configuration
-struct ClimateConfig {
-    double wind_speed_ref = 3.5;   // Reference wind speed at 10m [m/s]
-    double wind_angle_deg = 225.0; // South-West monsoon direction [degrees] (225° is SW)
-    double z_ref = 10.0;           // Reference height for ABL [m]
-    double terrain_alpha = 0.22;   // Power-law exponent for coastal/suburban terrain
+// Universal Atmospheric Boundary Layer (ABL) Environmental Configuration
+struct EnvironmentConfig {
     double outdoor_temp = 32.0;    // Ambient outdoor temperature [°C]
-    double relative_humidity = 80.0;// Relative humidity [%]
-    double solar_heat_flux = 150.0; // Wall solar radiation heating [W/m^2]
+    double wind_speed_ref = 3.5;   // Reference wind speed at reference height [m/s]
+    double wind_angle_deg = 225.0; // Wind direction azimuth [degrees] (0°=N, 90°=E, 180°=S, 225°=SW, 270°=W)
+    double z_ref = 10.0;           // Reference anemometer measurement height [m]
+    double terrain_alpha = 0.22;   // ABL Power-law shear exponent (0.14=open, 0.22=suburban, 0.33=urban)
+    double relative_humidity = 65.0;// Relative humidity [%]
+    double solar_heat_flux = 100.0; // Wall solar radiation heating [W/m^2]
 };
 
-// Simulation Configuration
+using ClimateConfig = EnvironmentConfig; // Alias for backward compatibility
+
+// Simulation Domain & Solver Configuration
 struct SimulationConfig {
     int nx = 64;                   // Grid resolution along X
     int ny = 28;                   // Grid resolution along Y (Height)
     int nz = 36;                   // Grid resolution along Z (Depth)
 
-    double lx = 10.0;              // Domain length [m] (e.g. 2 rooms: 5m each)
-    double ly = 3.0;               // Domain height [m] (ceiling height)
+    double lx = 10.0;              // Domain length [m]
+    double ly = 2.80;              // Domain height [m] (Standard Fixed Ceiling Height = 280 cm)
     double lz = 5.0;               // Domain width [m]
 
     double dt = 0.01;              // Time step [s] (adjusted dynamically by CFL)

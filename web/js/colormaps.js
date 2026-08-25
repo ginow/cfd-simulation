@@ -34,7 +34,7 @@ const Colormaps = {
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   },
 
-  // Viridis Colormap
+  // Viridis Colormap (Perceptually Uniform)
   viridis: function(t) {
     t = Math.max(0.0, Math.min(1.0, t));
     const c0 = [68, 1, 84];
@@ -91,17 +91,23 @@ const Colormaps = {
     return [Math.round(r), Math.round(g), Math.round(b)];
   },
 
-  getColor: function(name, t) {
+  // Normalized color lookup
+  getColor: function(name, val, minVal, maxVal) {
+    let t = val;
+    if (minVal !== undefined && maxVal !== undefined && maxVal > minVal) {
+      t = (val - minVal) / (maxVal - minVal);
+    }
+    t = Math.max(0.0, Math.min(1.0, isNaN(t) ? 0.0 : t));
     const fn = this[name] || this.turbo;
     return fn(t);
   },
 
-  sample: function(name, t) {
-    return this.getColor(name, t);
+  sample: function(name, val, minVal, maxVal) {
+    return this.getColor(name, val, minVal, maxVal);
   },
 
-  getCSSColor: function(name, t) {
-    const rgb = this.getColor(name, t);
+  getCSSColor: function(name, val, minVal, maxVal) {
+    const rgb = this.getColor(name, val, minVal, maxVal);
     return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
   }
 };

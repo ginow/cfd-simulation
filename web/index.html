@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Indoor Room CFD Thermal Simulation (Kerala Climate)</title>
+  <title>AeroThermal3D: Coupled CFD Indoor Convection Engine & Architectural CAD</title>
   <link rel="stylesheet" href="css/style.css">
   <!-- Three.js for 3D Volumetric View -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -17,36 +17,48 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
         </svg>
-        Coupled CFD Thermal-Fluid Indoor Simulation
+        AeroThermal3D: Coupled CFD Simulation & CAD
         <span class="badge">LES + Boussinesq</span>
-        <span class="badge kerala">Kerala Climate (32°C / SW Monsoon)</span>
+        <span class="badge env" id="badge-mode-indicator">Mode: Simulation</span>
       </h1>
-      <div class="subtitle">2 Connected Suites • 4 Windows • 2 Doors • 2x Human Thermal Sources (37.0°C) • Staggered MAC Grid</div>
+      <div class="subtitle">Parametric Atmospheric Wind • Dynamic Wall CAD (2.8m Height) • Casement Windows & Swing Doors • 6ft Occupants (37°C)</div>
     </div>
 
     <div class="top-controls">
+      <!-- Mode Switcher -->
+      <div class="mode-switcher-group">
+        <button id="btn-mode-design" class="mode-btn design">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Design Mode
+        </button>
+        <button id="btn-mode-sim" class="mode-btn active sim">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Simulation Mode
+        </button>
+      </div>
+
       <!-- 2D / 3D View Switcher -->
       <div class="btn-group">
-        <button id="btn-view-2d" class="btn-toggle active">2D Planar Slice</button>
-        <button id="btn-view-3d" class="btn-toggle">3D Volumetric Scene</button>
+        <button id="btn-view-2d" class="btn-toggle active">2D Planar View</button>
+        <button id="btn-view-3d" class="btn-toggle">3D Scene View</button>
       </div>
 
-      <!-- Speed Multiplier -->
-      <div class="toolbar-item" style="margin-right:8px;">
-        <label style="font-size:0.8rem;color:#8b949e;">Speed:</label>
-        <select id="select-sim-speed" style="background:#21262d;color:#fff;border:1px solid #30363d;padding:4px 8px;border-radius:4px;font-size:0.8rem;">
-          <option value="1">1x (Normal)</option>
-          <option value="2">2x (Fast)</option>
-          <option value="4" selected>4x (Real-Time 1.0s/s)</option>
-          <option value="8">8x (Turbo)</option>
-        </select>
+      <!-- Simulation Playback Controls (Active in Sim Mode) -->
+      <div id="sim-playback-controls" style="display:flex;align-items:center;gap:8px;">
+        <div class="toolbar-item">
+          <label style="font-size:0.78rem;color:#8b949e;">Speed:</label>
+          <select id="select-sim-speed" style="background:#21262d;color:#fff;border:1px solid #30363d;padding:3px 6px;border-radius:4px;font-size:0.78rem;">
+            <option value="1">1x (Normal)</option>
+            <option value="2">2x (Fast)</option>
+            <option value="4" selected>4x (Real-Time)</option>
+            <option value="8">8x (Turbo)</option>
+          </select>
+        </div>
+        <button id="btn-play-pause" class="btn-action play-btn">❚❚ Pause</button>
+        <button id="btn-step" class="btn-action">Step</button>
+        <button id="btn-reset" class="btn-action">Reset</button>
+        <button id="btn-export-vtk" class="btn-action">VTK</button>
       </div>
-
-      <!-- Play / Pause / Step / Reset / Export -->
-      <button id="btn-play-pause" class="btn-action play-btn">❚❚ Pause</button>
-      <button id="btn-step" class="btn-action">Step</button>
-      <button id="btn-reset" class="btn-action">Reset</button>
-      <button id="btn-export-vtk" class="btn-action">Export VTK</button>
     </div>
   </header>
 
@@ -56,11 +68,50 @@
     <!-- Viewport Area -->
     <div class="viewport-container" id="viewport-main">
       <canvas id="canvas-2d"></canvas>
-      <div id="viewport-3d-container" style="width:100%;height:100%;">
+      <div id="viewport-3d-container">
         <canvas id="canvas-3d"></canvas>
       </div>
 
-      <!-- Floating 2D Controls Toolbar -->
+      <!-- Floating CAD Toolbar (Visible in Design Mode) -->
+      <div class="cad-floating-toolbar" id="toolbar-cad">
+        <button id="tool-select" class="cad-tool-btn active" title="Select & Move Objects">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7 18 3-7 7-3L3 3z"/></svg>
+          Select / Move
+        </button>
+        <button id="tool-wall" class="cad-tool-btn" title="Add Wall Segment (Extruded 2.8m)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+          Add Wall
+        </button>
+        <button id="tool-window" class="cad-tool-btn" title="Add Casement Window (Adjustable W/H/Y)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+          Add Window
+        </button>
+        <button id="tool-door" class="cad-tool-btn" title="Add Door with 90° Swing Arc">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"/><path d="M2 20h20"/><circle cx="14" cy="12" r="1"/></svg>
+          Add Door
+        </button>
+        <button id="tool-human" class="cad-tool-btn" title="Add 6-Foot Human Dummy (37°C Buoyancy Source)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+          Add 6ft Dummy
+        </button>
+        <div class="cad-divider"></div>
+        <button id="btn-cad-delete" class="cad-tool-btn danger" title="Delete Selected Item">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete Selected
+        </button>
+        <div class="cad-divider"></div>
+        <button id="btn-export-design" class="cad-tool-btn" title="Export Design JSON">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export (.json)
+        </button>
+        <button id="btn-import-design" class="cad-tool-btn" title="Import Design JSON">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import (.json)
+        </button>
+        <input type="file" id="file-import-design" accept=".json" style="display:none">
+      </div>
+
+      <!-- Floating 2D Controls Toolbar (Simulation Mode) -->
       <div class="viewport-toolbar" id="toolbar-2d-controls">
         <div class="toolbar-item">
           <label>Slice Plane:</label>
@@ -72,9 +123,9 @@
         </div>
 
         <div class="toolbar-item">
-          <label>Slice Coordinate:</label>
-          <input type="range" id="slider-slice-index" min="0" max="27" value="14" class="slider-input" style="width:90px;">
-          <span id="slice-index-val" style="color:var(--accent-blue);font-family:monospace;font-weight:700;">14</span>
+          <label>Elevation Y:</label>
+          <input type="range" id="slider-slice-index" min="0" max="27" value="14" class="slider-input" style="width:80px;">
+          <span id="slice-index-val" style="color:var(--accent-blue);font-family:monospace;font-weight:700;">1.4m</span>
         </div>
 
         <div class="toolbar-item">
@@ -82,14 +133,14 @@
           <select id="select-colormap">
             <option value="turbo">Google Turbo (Rainbow)</option>
             <option value="jet">CFD Jet</option>
-            <option value="viridis">Viridis (Uniform)</option>
-            <option value="inferno">Inferno (Thermal)</option>
+            <option value="viridis">Viridis</option>
+            <option value="inferno">Inferno</option>
             <option value="coolwarm">CoolWarm</option>
           </select>
         </div>
 
         <div class="toolbar-item">
-          <label><input type="checkbox" id="chk-show-vectors" checked> Velocity Vectors</label>
+          <label><input type="checkbox" id="chk-show-vectors" checked> Vectors</label>
         </div>
 
         <div class="toolbar-item">
@@ -98,16 +149,16 @@
       </div>
 
       <!-- Colorbar Legend -->
-      <div class="colorbar-container">
+      <div class="colorbar-container" id="colorbar-panel">
         <div class="colorbar-title">
-          <span>Temperature Scale</span>
+          <span>Temperature Field</span>
           <span>[°C]</span>
         </div>
         <div class="colorbar-gradient" id="colorbar-gradient"></div>
         <div class="colorbar-labels">
-          <span>32.0°C (Ambient)</span>
-          <span>34.5°C</span>
-          <span style="color:#f85149;font-weight:700;">37.0°C (Body)</span>
+          <span id="colorbar-min-lbl">32.0°C</span>
+          <span id="colorbar-mid-lbl">34.5°C</span>
+          <span id="colorbar-max-lbl" style="color:#f85149;font-weight:700;">37.0°C</span>
         </div>
       </div>
 
@@ -115,261 +166,155 @@
       <div id="probe-tooltip" class="probe-tooltip"></div>
     </div>
 
-    <!-- Sidebar Controls and Diagnostics -->
+    <!-- Sidebar -->
     <div class="sidebar">
 
-      <!-- 1. Live Spatial Point Probe -->
-      <div class="panel-card">
-        <h3>
-          <span>Spatial Point Probe</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
-        </h3>
-        <div class="metrics-grid">
-          <div class="metric-box">
-            <div class="metric-label">Coordinates (X, Y, Z)</div>
-            <div class="metric-val" id="probe-coord" style="font-size:0.85rem;">(2.50, 1.50, 2.50) m</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Temperature T</div>
-            <div class="metric-val highlight-temp" id="probe-temp" style="font-size:0.85rem;">32.00 °C</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Velocity Vector [u,v,w]</div>
-            <div class="metric-val highlight-vel" id="probe-vel" style="font-size:0.82rem;">[0.00, 0.00, 0.00]</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Wind Speed ||u||</div>
-            <div class="metric-val highlight-vel" id="probe-speed" style="font-size:0.85rem;">0.00 m/s</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Pressure (Gauge)</div>
-            <div class="metric-val" id="probe-pressure" style="font-size:0.85rem;">0.000 Pa</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Region Type</div>
-            <div class="metric-val" id="probe-type" style="font-size:0.75rem;color:var(--accent-cyan);">Air (Fluid)</div>
+      <!-- ================= DESIGN MODE SIDEBAR PANELS ================= -->
+      <div id="sidebar-design-section" style="display:none;flex-direction:column;gap:12px;">
+
+        <!-- Selected Object Inspector -->
+        <div class="panel-card inspector-card">
+          <h3>
+            <span>Property Inspector</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </h3>
+          <div id="inspector-content">
+            <div style="font-size:0.8rem;color:var(--text-secondary);text-align:center;padding:12px 0;">
+              Click on any wall, window, door, or 6ft dummy on the floor plan to edit its properties.
+            </div>
           </div>
         </div>
+
+        <!-- Architectural Layout Presets -->
+        <div class="panel-card">
+          <h3>
+            <span>Architectural Presets</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </h3>
+          <div class="presets-row">
+            <button id="btn-preset-2room" class="btn-action" style="justify-content:center;">2-Room Suite</button>
+            <button id="btn-preset-studio" class="btn-action" style="justify-content:center;">Open Studio</button>
+            <button id="btn-preset-3room" class="btn-action" style="justify-content:center;">3-Room Flat</button>
+            <button id="btn-preset-corridor" class="btn-action" style="justify-content:center;">Hall & Balcony</button>
+          </div>
+        </div>
+
       </div>
 
-      <!-- 2. CFD Solver Diagnostics -->
-      <div class="panel-card">
-        <h3>
-          <span>CFD Simulation Metrics</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </h3>
-        <div class="metrics-grid">
-          <div class="metric-box">
-            <div class="metric-label">Physical Time</div>
-            <div class="metric-val" id="stat-time">0.00 s</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Step Count</div>
-            <div class="metric-val" id="stat-step">0</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Adaptive Time Step dt</div>
-            <div class="metric-val" id="stat-dt">10.0 ms</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Max Flow Velocity</div>
-            <div class="metric-val highlight-vel" id="stat-max-vel">0.00 m/s</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Average Room Temp</div>
-            <div class="metric-val highlight-temp" id="stat-avg-temp">32.00 °C</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Domain Temp Bounds</div>
-            <div class="metric-val" style="font-size:0.82rem;"><span id="stat-min-temp">32.0</span> - <span id="stat-max-temp" style="color:var(--accent-red);">37.0</span> °C</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Max Divergence |∇·u|</div>
-            <div class="metric-val" id="stat-divergence" style="font-size:0.85rem;">0.00e+0</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Solver Compute Time</div>
-            <div class="metric-val" id="stat-compute-ms" style="font-size:0.85rem;">0.0 ms</div>
-          </div>
-        </div>
-      </div>
+      <!-- ================= SIMULATION MODE SIDEBAR PANELS ================= -->
+      <div id="sidebar-sim-section" style="display:flex;flex-direction:column;gap:12px;">
 
-      <!-- 3. Kerala Environmental Climate Controls -->
-      <div class="panel-card">
-        <h3>
-          <span>Kerala Meteorological Conditions</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-        </h3>
-        
-        <div class="control-row">
-          <div class="control-header">
-            <span>Reference Wind Speed (at 10m ABL):</span>
-            <span class="val-display" id="disp-wind-speed">3.5 m/s</span>
-          </div>
-          <input type="range" id="slider-wind-speed" min="0.0" max="10.0" step="0.1" value="3.5" class="slider-input">
-        </div>
-
-        <div class="control-row">
-          <div class="control-header">
-            <span>Wind Inflow Angle (225° = South-West Monsoon):</span>
-            <span class="val-display" id="disp-wind-angle">225°</span>
-          </div>
-          <input type="range" id="slider-wind-angle" min="0" max="360" step="5" value="225" class="slider-input">
-        </div>
-
-        <div class="control-row">
-          <div class="control-header">
-            <span>Outdoor Ambient Temperature:</span>
-            <span class="val-display" id="disp-outdoor-temp">32.0 °C</span>
-          </div>
-          <input type="range" id="slider-outdoor-temp" min="24.0" max="42.0" step="0.5" value="32.0" class="slider-input">
-        </div>
-      </div>
-
-      <!-- 4. Human Occupant Thermal Sources (37°C) -->
-      <div class="panel-card">
-        <h3>
-          <span>Human Thermal Sources (Buoyant Plumes)</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </h3>
-
-        <div class="control-row">
-          <div class="control-header">
-            <span>Room 1 Human Body Temp:</span>
-            <span class="val-display" id="disp-human1-temp">37.0 °C</span>
-          </div>
-          <input type="range" id="slider-human1-temp" min="30.0" max="42.0" step="0.5" value="37.0" class="slider-input">
-        </div>
-
-        <div class="control-row">
-          <div class="control-header">
-            <span>Room 2 Human Body Temp:</span>
-            <span class="val-display" id="disp-human2-temp">37.0 °C</span>
-          </div>
-          <input type="range" id="slider-human2-temp" min="30.0" max="42.0" step="0.5" value="37.0" class="slider-input">
-        </div>
-      </div>
-
-      <!-- 5. Windows & Doors Ventilation Apertures -->
-      <div class="panel-card">
-        <h3>
-          <span>Ventilation Openings (4 Windows & 2 Doors)</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
-        </h3>
-
-        <div class="openings-list">
-          <div style="font-size:0.75rem;color:#58a6ff;margin-bottom:8px;padding:4px 8px;background:rgba(56,139,253,0.1);border-radius:4px;border:1px solid rgba(56,139,253,0.2);">
-            💡 <b>Tip:</b> Click & <b>drag-and-drop</b> windows & doors directly on the 2D Floor Plan, or use the position sliders below!
-          </div>
-
-          <!-- Window 1A -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Room 1: West Window</span>
-              <span class="opening-tag inflow">Inflow Window</span>
+        <!-- 1. Live Spatial Point Probe -->
+        <div class="panel-card">
+          <h3>
+            <span>Spatial Point Probe</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          </h3>
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-label">Coordinates (X, Y, Z)</div>
+              <div class="metric-val" id="probe-coord" style="font-size:0.82rem;">(2.50, 1.40, 2.50) m</div>
             </div>
+            <div class="metric-box">
+              <div class="metric-label">Temperature T</div>
+              <div class="metric-val highlight-temp" id="probe-temp" style="font-size:0.85rem;">32.00 °C</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Velocity [u,v,w]</div>
+              <div class="metric-val highlight-vel" id="probe-vel" style="font-size:0.80rem;">[0.00, 0.00, 0.00]</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Wind Speed ||u||</div>
+              <div class="metric-val highlight-vel" id="probe-speed" style="font-size:0.85rem;">0.00 m/s</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Pressure (Gauge)</div>
+              <div class="metric-val" id="probe-pressure" style="font-size:0.85rem;">0.000 Pa</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Region Type</div>
+              <div class="metric-val" id="probe-type" style="font-size:0.75rem;color:var(--accent-cyan);">Air (Fluid)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. CFD Solver Diagnostics -->
+        <div class="panel-card">
+          <h3>
+            <span>CFD Solver Metrics</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </h3>
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-label">Physical Time</div>
+              <div class="metric-val" id="stat-time">0.00 s</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Step Count</div>
+              <div class="metric-val" id="stat-step">0</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Adaptive dt</div>
+              <div class="metric-val" id="stat-dt">10.0 ms</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Max Velocity</div>
+              <div class="metric-val highlight-vel" id="stat-max-vel">0.00 m/s</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Average Room Temp</div>
+              <div class="metric-val highlight-temp" id="stat-avg-temp">32.00 °C</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Domain Bounds</div>
+              <div class="metric-val" style="font-size:0.80rem;"><span id="stat-min-temp">32.0</span> - <span id="stat-max-temp" style="color:var(--accent-red);">37.0</span> °C</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Universal Atmospheric Weather Conditions -->
+        <div class="panel-card">
+          <h3>
+            <span>Outdoor Climate Conditions</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          </h3>
+          
+          <div class="control-row">
             <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-win-w1a">100%</span>
+              <span>Outdoor Ambient Temperature:</span>
+              <span class="val-display" id="disp-outdoor-temp">32.0 °C</span>
             </div>
-            <input type="range" id="slider-win-w1a" min="0" max="100" value="100" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (Z):</span>
-              <span class="val-display" id="disp-pos-w1a">2.50 m</span>
-            </div>
-            <input type="range" id="slider-pos-w1a" min="1.0" max="4.0" step="0.05" value="2.50" class="slider-input">
+            <input type="range" id="slider-outdoor-temp" min="15.0" max="45.0" step="0.5" value="32.0" class="slider-input">
           </div>
 
-          <!-- Window 1B -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Room 1: South Window</span>
-              <span class="opening-tag inflow">Cross Window</span>
-            </div>
+          <div class="control-row">
             <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-win-w1b">100%</span>
+              <span>Reference Wind Speed (at 10m ABL):</span>
+              <span class="val-display" id="disp-wind-speed">3.5 m/s</span>
             </div>
-            <input type="range" id="slider-win-w1b" min="0" max="100" value="100" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (X):</span>
-              <span class="val-display" id="disp-pos-w1b">2.50 m</span>
-            </div>
-            <input type="range" id="slider-pos-w1b" min="1.0" max="4.0" step="0.05" value="2.50" class="slider-input">
+            <input type="range" id="slider-wind-speed" min="0.0" max="15.0" step="0.1" value="3.5" class="slider-input">
           </div>
 
-          <!-- Partition Door D1 -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Inter-Room Partition Door</span>
-              <span class="opening-tag door">Connecting Door</span>
-            </div>
+          <div class="control-row">
             <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-door-d1">100%</span>
+              <span>Wind Direction Angle:</span>
+              <span class="val-display" id="disp-wind-angle">225° (SW)</span>
             </div>
-            <input type="range" id="slider-door-d1" min="0" max="100" value="100" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (Z):</span>
-              <span class="val-display" id="disp-pos-d1">2.50 m</span>
-            </div>
-            <input type="range" id="slider-pos-d1" min="1.0" max="4.0" step="0.05" value="2.50" class="slider-input">
-          </div>
-
-          <!-- Window 2A -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Room 2: North Window</span>
-              <span class="opening-tag inflow">North Window</span>
-            </div>
-            <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-win-w2a">100%</span>
-            </div>
-            <input type="range" id="slider-win-w2a" min="0" max="100" value="100" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (X):</span>
-              <span class="val-display" id="disp-pos-w2a">7.50 m</span>
-            </div>
-            <input type="range" id="slider-pos-w2a" min="6.0" max="9.0" step="0.05" value="7.50" class="slider-input">
-          </div>
-
-          <!-- Window 2B -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Room 2: East Window</span>
-              <span class="opening-tag outflow">Outflow Window</span>
-            </div>
-            <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-win-w2b">100%</span>
-            </div>
-            <input type="range" id="slider-win-w2b" min="0" max="100" value="100" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (Z):</span>
-              <span class="val-display" id="disp-pos-w2b">2.50 m</span>
-            </div>
-            <input type="range" id="slider-pos-w2b" min="1.0" max="4.0" step="0.05" value="2.50" class="slider-input">
-          </div>
-
-          <!-- Door D2 -->
-          <div class="opening-item">
-            <div class="opening-header">
-              <span class="opening-title">Room 2: South Exterior Door</span>
-              <span class="opening-tag door">Exterior Door</span>
-            </div>
-            <div class="control-header">
-              <span>Open Ratio:</span>
-              <span class="val-display" id="disp-door-d2">50%</span>
-            </div>
-            <input type="range" id="slider-door-d2" min="0" max="100" value="50" class="slider-input">
-            <div class="control-header" style="margin-top:6px;">
-              <span>Wall Position (X):</span>
-              <span class="val-display" id="disp-pos-d2">7.00 m</span>
-            </div>
-            <input type="range" id="slider-pos-d2" min="6.0" max="9.0" step="0.05" value="7.00" class="slider-input">
+            <input type="range" id="slider-wind-angle" min="0" max="360" step="5" value="225" class="slider-input">
           </div>
         </div>
+
+        <!-- 4. Dynamic Ventilation Openings List -->
+        <div class="panel-card">
+          <h3>
+            <span>Ventilation Openings & Sashes</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18M12 3v18"/></svg>
+          </h3>
+          <div class="openings-list" id="sim-openings-list">
+            <!-- Dynamically populated from geometry -->
+          </div>
+        </div>
+
       </div>
 
     </div>

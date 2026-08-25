@@ -267,6 +267,23 @@ std::string WebServer::handle_http_request(const std::string& request_str, [[may
                "Content-Length: " + std::to_string(json.size()) + "\r\n\r\n" + json;
     }
 
+    if (path == "/api/design") {
+        if (method == "GET") {
+            std::string json = engine.get_design_json();
+            return "HTTP/1.1 200 OK\r\n" + cors_headers +
+                   "Content-Type: application/json\r\n" +
+                   "Content-Length: " + std::to_string(json.size()) + "\r\n\r\n" + json;
+        } else if (method == "POST") {
+            size_t body_pos = request_str.find("\r\n\r\n");
+            std::string body = (body_pos != std::string::npos) ? request_str.substr(body_pos + 4) : "";
+            bool ok = engine.load_design_json(body);
+            std::string res = ok ? "{\"status\":\"ok\"}" : "{\"status\":\"error\",\"msg\":\"Invalid design JSON\"}";
+            return "HTTP/1.1 200 OK\r\n" + cors_headers +
+                   "Content-Type: application/json\r\n" +
+                   "Content-Length: " + std::to_string(res.size()) + "\r\n\r\n" + res;
+        }
+    }
+
     if (path == "/api/slice") {
         int axis = 1; // Default Y-slice
         int index = 14;
@@ -309,6 +326,8 @@ std::string WebServer::handle_http_request(const std::string& request_str, [[may
         std::string body = (body_pos != std::string::npos) ? request_str.substr(body_pos + 4) : "";
         std::string cmd = get_json_string(body, "cmd");
 
+        int res_id = 0;
+
         // Execute only on exact command match
         if (cmd == "toggle_pause") {
             engine.set_paused(!engine.is_paused.load());
@@ -322,36 +341,110 @@ std::string WebServer::handle_http_request(const std::string& request_str, [[may
             engine.set_wind_angle(get_json_number(body, "val", 225.0));
         } else if (cmd == "set_outdoor_temp") {
             engine.set_outdoor_temp(get_json_number(body, "val", 32.0));
-        } else if (cmd == "set_human_temp") {
-            int r = get_json_int(body, "room", 0);
-            double t = get_json_number(body, "val", 37.0);
-            engine.set_human_temp(r, t);
-        } else if (cmd == "set_window") {
-            int idx = get_json_int(body, "idx", 0);
-            double op = get_json_number(body, "open", 1.0);
-            engine.set_window_state(idx, op);
-        } else if (cmd == "set_door") {
-            int idx = get_json_int(body, "idx", 0);
-            double op = get_json_number(body, "open", 1.0);
-            engine.set_door_state(idx, op);
-        } else if (cmd == "move_window") {
-            int idx = get_json_int(body, "idx", 0);
-            double x = get_json_number(body, "x", 0.0);
-            double z = get_json_number(body, "z", 0.0);
-            engine.move_window(idx, x, z);
-        } else if (cmd == "move_door") {
-            int idx = get_json_int(body, "idx", 0);
-            double x = get_json_number(body, "x", 0.0);
-            double z = get_json_number(body, "z", 0.0);
-            engine.move_door(idx, x, z);
         } else if (cmd == "set_substeps") {
             int s = get_json_int(body, "val", 4);
             engine.set_substeps(s);
         } else if (cmd == "export_vtk") {
             engine.export_vtk("indoor_cfd_thermal.vtk");
         }
+        // Wall CAD actions
+        else if (cmd == "add_wall") {
+            double x1 = get_json_number(body, "x1");
+            double z1 = get_json_number(body, "z1");
+            double x2 = get_json_number(body, "x2");
+            double z2 = get_json_number(body, "z2");
+            double th = get_json_number(body, "thickness", 0.20);
+            res_id = engine.add_wall(x1, z1, x2, z2, th);
+        } else if (cmd == "delete_wall") {
+            int id = get_json_int(body, "id");
+            engine.delete_wall(id);
+        } else if (cmd == "move_wall") {
+            int id = get_json_int(body, "id");
+            double x1 = get_json_number(body, "x1");
+            double z1 = get_json_number(body, "z1");
+            double x2 = get_json_number(body, "x2");
+            double z2 = get_json_number(body, "z2");
+            engine.move_wall(id, x1, z1, x2, z2);
+        }
+        // Window CAD actions
+        else if (cmd == "add_window") {
+            double x = get_json_number(body, "x");
+            double y = get_json_number(body, "y", 1.50);
+            double z = get_json_number(body, "z");
+            double w = get_json_number(body, "width", 1.50);
+            double h = get_json_number(body, "height", 1.20);
+            double nx = get_json_number(body, "nx", 1.0);
+            double nz = get_json_number(body, "nz", 0.0);
+            double op = get_json_number(body, "open_ratio", 1.0);
+            res_id = engine.add_window(x, y, z, w, h, Vec3(nx, 0.0, nz), op);
+        } else if (cmd == "delete_window") {
+            int id = get_json_int(body, "id");
+            engine.delete_window(id);
+        } else if (cmd == "move_window") {
+            int id = get_json_int(body, "id", get_json_int(body, "idx"));
+            double x = get_json_number(body, "x");
+            double y = get_json_number(body, "y", 1.50);
+            double z = get_json_number(body, "z");
+            engine.move_window_3d(id, x, y, z);
+        } else if (cmd == "resize_window") {
+            int id = get_json_int(body, "id");
+            double w = get_json_number(body, "width", 1.50);
+            double h = get_json_number(body, "height", 1.20);
+            engine.resize_window(id, w, h);
+        } else if (cmd == "set_window") {
+            int id = get_json_int(body, "id", get_json_int(body, "idx"));
+            double op = get_json_number(body, "open", 1.0);
+            engine.set_window_state(id, op);
+        }
+        // Door CAD actions
+        else if (cmd == "add_door") {
+            double x = get_json_number(body, "x");
+            double z = get_json_number(body, "z");
+            double w = get_json_number(body, "width", 1.00);
+            double h = get_json_number(body, "height", 2.10);
+            double nx = get_json_number(body, "nx", 1.0);
+            double nz = get_json_number(body, "nz", 0.0);
+            double op = get_json_number(body, "open_ratio", 1.0);
+            res_id = engine.add_door(x, z, w, h, Vec3(nx, 0.0, nz), op, true);
+        } else if (cmd == "delete_door") {
+            int id = get_json_int(body, "id");
+            engine.delete_door(id);
+        } else if (cmd == "move_door") {
+            int id = get_json_int(body, "id", get_json_int(body, "idx"));
+            double x = get_json_number(body, "x");
+            double z = get_json_number(body, "z");
+            engine.move_door(id, x, z);
+        } else if (cmd == "resize_door") {
+            int id = get_json_int(body, "id");
+            double w = get_json_number(body, "width", 1.00);
+            double h = get_json_number(body, "height", 2.10);
+            engine.resize_door(id, w, h);
+        } else if (cmd == "set_door") {
+            int id = get_json_int(body, "id", get_json_int(body, "idx"));
+            double op = get_json_number(body, "open", 1.0);
+            engine.set_door_state(id, op);
+        }
+        // Human Occupant (6ft Dummy) CAD actions
+        else if (cmd == "add_occupant") {
+            double x = get_json_number(body, "x", 2.5);
+            double z = get_json_number(body, "z", 2.5);
+            double temp = get_json_number(body, "temperature", 37.0);
+            res_id = engine.add_occupant(x, z, temp);
+        } else if (cmd == "delete_occupant") {
+            int id = get_json_int(body, "id");
+            engine.delete_occupant(id);
+        } else if (cmd == "move_occupant") {
+            int id = get_json_int(body, "id", get_json_int(body, "idx"));
+            double x = get_json_number(body, "x");
+            double z = get_json_number(body, "z");
+            engine.move_occupant(id, x, z);
+        } else if (cmd == "set_human_temp") {
+            int id = get_json_int(body, "id", get_json_int(body, "room"));
+            double t = get_json_number(body, "val", 37.0);
+            engine.set_human_temp(id, t);
+        }
 
-        std::string json = "{\"status\":\"ok\"}";
+        std::string json = "{\"status\":\"ok\",\"id\":" + std::to_string(res_id) + "}";
         return "HTTP/1.1 200 OK\r\n" + cors_headers +
                "Content-Type: application/json\r\n" +
                "Content-Length: " + std::to_string(json.size()) + "\r\n\r\n" + json;

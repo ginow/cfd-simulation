@@ -17,14 +17,14 @@ void signal_handler([[maybe_unused]] int signal) {
 
 void print_banner() {
     std::cout << "======================================================================\n";
-    std::cout << "  ADVANCED 3D COUPLED THERMAL-FLUID CFD ROOM SIMULATION ENGINE\n";
+    std::cout << "  AEROTHERMAL3D: COUPLED THERMAL-FLUID CFD INDOOR CONVECTION ENGINE\n";
     std::cout << "  Large Eddy Simulation (LES) & Boussinesq Thermal Convection\n";
-    std::cout << "  Kerala (South India) Climatic Conditions & Multi-Room Microclimate\n";
+    std::cout << "  Universal Atmospheric Boundary Layer & Interactive CAD Architecture\n";
     std::cout << "======================================================================\n";
-    std::cout << " [✓] Physical Domain: 10.0 m (L) x 3.0 m (H) x 5.0 m (W) [2 Connected Suites]\n";
-    std::cout << " [✓] Kerala Climate : Ambient 32.0°C | Wind SW (225°) @ 3.5 m/s (ABL Profile)\n";
-    std::cout << " [✓] Thermal Sources: 2x Human Occupants at 37.0°C (Buoyant Thermal Plumes)\n";
-    std::cout << " [✓] Openings       : 4 Windows (Inflow/Outflow/Cross-Vent) + 2 Doors\n";
+    std::cout << " [✓] Physical Domain: 10.0 m (L) x 2.80 m (H) x 5.0 m (W) [Fixed 280cm Ceiling]\n";
+    std::cout << " [✓] Environment    : Parametric ABL Profile (Wind Speed, Angle, Outdoor Temp)\n";
+    std::cout << " [✓] Human Dummy    : 6-Foot Occupants (1.83m) @ 37.0°C (Buoyant Thermal Plumes)\n";
+    std::cout << " [✓] Architecture   : Dynamic CAD Walls, Adjustable Casement Windows & Doors\n";
     std::cout << " [✓] Optimizations  : SIMD AVX2 + FMA + Cache-Contiguous Memory + Fast SOR\n";
     std::cout << " [✓] OpenMP Threads : " << omp_get_max_threads() << " threads detected and enabled\n";
     std::cout << "======================================================================\n\n";

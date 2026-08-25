@@ -95,6 +95,14 @@ public:
         return (t == CELL_SOLID_WALL || t == CELL_HOT_BODY);
     }
 
+    // Compute divergence at cell (i, j, k)
+    inline double divergence(int i, int j, int k) const {
+        double du = (u[idx_u(i + 1, j, k)] - u[idx_u(i, j, k)]) * inv_dx;
+        double dv = (v[idx_v(i, j + 1, k)] - v[idx_v(i, j, k)]) * inv_dy;
+        double dw = (w[idx_w(i, j, k + 1)] - w[idx_w(i, j, k)]) * inv_dz;
+        return std::abs(du + dv + dw);
+    }
+
     // Compute distance field to solid walls for turbulence damping
     void compute_wall_distances();
 
