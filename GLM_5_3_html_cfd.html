@@ -1,0 +1,2968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AeroThermal3D — Coupled CFD Indoor Airflow &amp; Architectural CAD Engine</title>
+<style>
+:root{
+  --bg:#0b0f14; --bg2:#111823; --panel:#141d2b; --panel2:#182335; --line:#233247;
+  --line2:#2d4059; --txt:#d8e2ef; --txt2:#8fa3bc; --txt3:#5d7290;
+  --acc:#38bdf8; --acc2:#0ea5e9; --hot:#f97316; --hot2:#fb923c; --good:#34d399;
+  --warn:#fbbf24; --danger:#f87171; --sel:#f59e0b;
+  --r:8px; --rs:5px;
+  font-size:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--txt);
+  font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  display:flex; flex-direction:column; overflow:hidden;
+  -webkit-user-select:none; user-select:none;
+}
+input,select,button{font-family:inherit}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2b3d57;border-radius:5px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ TOP BAR ============ */
+#topbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:7px 12px;background:linear-gradient(180deg,#16233a,#101a29);
+  border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.45);z-index:20;
+}
+#brand{display:flex;align-items:baseline;gap:9px;margin-right:6px;white-space:nowrap}
+#brand .logo{font-size:19px;filter:drop-shadow(0 0 6px rgba(56,189,248,.55))}
+#brand .name{font-size:16.5px;font-weight:700;letter-spacing:.4px;
+  background:linear-gradient(90deg,#7dd3fc,#38bdf8 45%,#f97316);-webkit-background-clip:text;background-clip:text;color:transparent}
+#brand .sub{font-size:10.5px;color:var(--txt3);letter-spacing:.5px}
+.badge{display:inline-block;padding:1.5px 7px;border-radius:4px;font-size:9.5px;font-weight:600;
+  letter-spacing:.4px;border:1px solid;white-space:nowrap}
+.b-cpp{color:#8cb4ff;border-color:#2c4a7c;background:#12203a}
+.b-omp{color:#fbbf24;border-color:#6b4d0f;background:#2a2110}
+.b-simd{color:#f87171;border-color:#7c2c2c;background:#2a1414}
+.b-les{color:#34d399;border-color:#1d5c43;background:#0f231b}
+.b-mit{color:#9aa8bd;border-color:#3a4a5f;background:#1a2230}
+.seg{display:flex;border:1px solid var(--line2);border-radius:var(--r);overflow:hidden;background:var(--bg2)}
+.seg button{
+  border:0;background:transparent;color:var(--txt2);padding:6px 13px;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap
+}
+.seg button:hover{color:var(--txt);background:#1c2a40}
+.seg button.on{background:linear-gradient(180deg,#0e7490,#075985);color:#fff;box-shadow:inset 0 0 8px rgba(56,189,248,.35)}
+.seg button.on.design{background:linear-gradient(180deg,#b45309,#92400e);box-shadow:inset 0 0 8px rgba(251,146,60,.4)}
+.tbtn{
+  border:1px solid var(--line2);background:var(--panel2);color:var(--txt);padding:5.5px 11px;border-radius:var(--r);
+  font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap
+}
+.tbtn:hover{border-color:var(--acc);color:#bfe6ff;background:#1a2a42}
+.tbtn:active{transform:translateY(1px)}
+.tbtn.accent{border-color:#0e7490;background:linear-gradient(180deg,#0e7490,#075985);color:#fff}
+.tbtn.accent:hover{filter:brightness(1.15)}
+.tbtn.warn{border-color:#7c4a12;background:#2c1f0d;color:#fcd34d}
+.tbtn.warn:hover{border-color:var(--hot)}
+.tbtn:disabled{opacity:.4;cursor:not-allowed}
+select.tbtn{padding:5.5px 6px}
+.spacer{flex:1}
+#playIcon{width:11px;display:inline-block}
+
+/* ============ MAIN LAYOUT ============ */
+#main{flex:1;display:flex;min-height:0}
+aside{
+  width:252px;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0
+}
+aside.right{border-right:0;border-left:1px solid var(--line)}
+.sec{border-bottom:1px solid var(--line);padding:10px 12px 12px}
+.sec h3{
+  font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--acc);
+  margin-bottom:9px;display:flex;align-items:center;gap:7px;font-weight:700
+}
+.sec h3 .n{background:#0c2a3d;border:1px solid #155d7d;color:#67d4ff;border-radius:3px;
+  font-size:9px;padding:0 4px;letter-spacing:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 0}
+.row label{color:var(--txt2);font-size:12px;flex-shrink:0}
+.val{color:#bfe0f5;font-size:12px;font-variant-numeric:tabular-nums;font-weight:600;min-width:52px;text-align:right}
+input[type=range]{flex:1;accent-color:var(--acc2);height:20px;cursor:pointer;min-width:60px}
+select.inp,input.inp{
+  width:100%;background:#0d1622;border:1px solid var(--line2);color:var(--txt);
+  padding:5px 7px;border-radius:var(--rs);font-size:12.5px;outline:none
+}
+select.inp:focus,input.inp:focus{border-color:var(--acc)}
+input[type=checkbox]{accent-color:var(--acc2);width:15px;height:15px;cursor:pointer}
+.chkrow{display:flex;align-items:center;gap:8px;margin:7px 0;color:var(--txt2);font-size:12.5px;cursor:pointer}
+.chkrow:hover{color:var(--txt)}
+
+/* tool palette */
+#toolGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tool{
+  border:1px solid var(--line2);background:var(--panel2);border-radius:var(--r);cursor:pointer;
+  padding:8px 4px 6px;text-align:center;color:var(--txt2);transition:all .13s;font-size:10px;line-height:1.25
+}
+.tool .ic{font-size:17px;display:block;margin-bottom:3px}
+.tool:hover{border-color:var(--hot);color:var(--txt);background:#1d2b41}
+.tool.on{border-color:var(--sel);color:#ffd9a0;background:#2b2110;box-shadow:0 0 8px rgba(245,158,11,.25)}
+.tool.danger:hover{border-color:var(--danger);color:#fecaca;background:#2b1518}
+
+/* property inspector */
+#propsPanel .noSel{color:var(--txt3);font-size:12px;text-align:center;padding:14px 6px;line-height:1.5}
+.prop{margin:8px 0}
+.prop>label{display:block;font-size:10.5px;color:var(--txt3);margin-bottom:3px;letter-spacing:.4px;text-transform:uppercase}
+.prop .prow{display:flex;gap:6px;align-items:center}
+.prop input[type=number]{
+  flex:1;background:#0d1622;border:1px solid var(--line2);color:#bfe0f5;padding:4px 7px;
+  border-radius:var(--rs);font-size:12.5px;outline:none;font-variant-numeric:tabular-nums
+}
+.prop input[type=number]:focus{border-color:var(--acc)}
+.prop .unit{color:var(--txt3);font-size:11px;width:30px;flex-shrink:0}
+.prop input[type=range]{width:100%}
+.objTitle{font-size:13px;font-weight:700;color:#ffd9a0;margin-bottom:2px;display:flex;align-items:center;gap:7px}
+.objTitle .tag{font-size:9px;background:#2b2110;border:1px solid #7c4a12;color:#fbbf24;
+  padding:1px 6px;border-radius:3px;letter-spacing:.6px}
+.btnRow{display:flex;gap:6px;margin-top:10px}
+.btnRow .tbtn{flex:1;justify-content:center;padding:5px 4px;font-size:11.5px}
+#envReadout{background:#0d1622;border:1px solid var(--line);border-radius:var(--rs);padding:8px 10px;
+  font-size:11.5px;line-height:1.75;color:var(--txt2);font-variant-numeric:tabular-nums}
+#envReadout b{color:#9fd8f7;font-weight:600}
+#azWrap{display:flex;align-items:center;gap:10px}
+#azDial{
+  width:46px;height:46px;border-radius:50%;border:2px solid var(--line2);flex-shrink:0;position:relative;
+  background:radial-gradient(circle,#13202f 60%,#0c1520)
+}
+#azArrow{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:var(--hot);transition:transform .1s linear;text-shadow:0 0 6px rgba(249,115,22,.6)}
+#azDial .N{position:absolute;top:1px;left:50%;transform:translateX(-50%);font-size:7.5px;color:var(--txt3)}
+
+/* sim info */
+#simInfoPanel .kv{display:flex;justify-content:space-between;margin:5px 0;font-size:12px;
+  font-variant-numeric:tabular-nums}
+#simInfoPanel .kv span:first-child{color:var(--txt2)}
+#simInfoPanel .kv span:last-child{color:#9fd8f7;font-weight:600}
+#simInfoPanel .kv.hot span:last-child{color:var(--hot2)}
+
+/* ============ CENTER VIEWPORT ============ */
+#center{flex:1;position:relative;min-width:0;background:#080b10;display:flex}
+.view{position:absolute;inset:0;display:none}
+.view.on{display:block}
+#c2d{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+#view3d{overflow:hidden}
+#c3d{width:100%;height:100%;display:block;touch-action:none}
+#viewBadge{
+  position:absolute;top:10px;left:12px;z-index:5;background:rgba(10,17,27,.82);border:1px solid var(--line2);
+  border-radius:var(--r);padding:5px 11px;font-size:11.5px;color:var(--txt2);pointer-events:none;
+  backdrop-filter:blur(4px);display:flex;gap:9px;align-items:center
+}
+#viewBadge b{color:#bfe6ff}
+#sliceBadge{position:absolute;top:10px;right:12px;z-index:5;background:rgba(10,17,27,.82);
+  border:1px solid var(--line2);border-radius:var(--r);padding:5px 11px;font-size:11.5px;
+  color:var(--txt2);pointer-events:none;backdrop-filter:blur(4px);font-variant-numeric:tabular-nums}
+#probeTip{
+  position:absolute;z-index:8;pointer-events:none;display:none;background:rgba(8,13,20,.93);
+  border:1px solid var(--acc);border-radius:var(--r);padding:7px 10px;font-size:11px;line-height:1.65;
+  font-variant-numeric:tabular-nums;color:#cfe6f7;box-shadow:0 4px 18px rgba(0,0,0,.6);min-width:148px
+}
+#probeTip .pt{color:var(--acc);font-weight:700;font-size:10px;letter-spacing:.8px;margin-bottom:2px}
+#probeTip .pr{display:flex;justify-content:space-between;gap:12px}
+#probeTip .pr b{color:#fff;font-weight:600}
+#legend{
+  position:absolute;left:12px;bottom:34px;z-index:5;background:rgba(10,17,27,.82);border:1px solid var(--line2);
+  border-radius:var(--r);padding:8px 10px 9px;backdrop-filter:blur(4px);width:172px
+}
+#legend.hidden{display:none}
+#legTitle{font-size:10px;color:var(--txt2);margin-bottom:5px;letter-spacing:.4px;font-weight:600}
+#legBar{height:10px;border-radius:3px;border:1px solid #000;position:relative}
+#legTicks{display:flex;justify-content:space-between;font-size:9.5px;color:var(--txt3);margin-top:3px;
+  font-variant-numeric:tabular-nums}
+#legMin,#legMax{color:var(--txt2)}
+#modeOverlay{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;
+  background:rgba(10,17,27,.85);border:1px solid var(--line2);border-radius:20px;padding:4px 16px;
+  font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--txt2);backdrop-filter:blur(4px)
+}
+#modeOverlay.design{color:#fbbf24;border-color:#7c4a12}
+#modeOverlay.sim{color:#67e8f9;border-color:#155d7d}
+#webglErr{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  color:var(--txt2);font-size:13px;padding:40px;text-align:center;line-height:1.7;z-index:10;background:#0a0f16}
+
+/* ============ STATUS BAR ============ */
+#statusbar{
+  display:flex;align-items:center;gap:4px;padding:4px 12px;background:#0d141d;border-top:1px solid var(--line);
+  font-size:11px;color:var(--txt3);flex-wrap:wrap;font-variant-numeric:tabular-nums
+}
+#statHint{color:var(--txt2);flex:1;min-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat{padding:1px 8px;border-left:1px solid var(--line);white-space:nowrap}
+.stat b{color:#9fd8f7;font-weight:600}
+.stat.hot b{color:var(--hot2)}
+
+/* ============ TOAST ============ */
+#toast{
+  position:fixed;bottom:46px;left:50%;transform:translateX(-50%) translateY(18px);z-index:100;
+  background:#101c2c;border:1px solid var(--acc);color:#d3ecff;padding:9px 18px;border-radius:var(--r);
+  font-size:12.5px;opacity:0;pointer-events:none;transition:all .28s;box-shadow:0 6px 26px rgba(0,0,0,.6);max-width:70vw
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{border-color:var(--danger);color:#fecaca}
+
+@media (max-width:1100px){
+  aside{width:216px}
+  #brand .sub{display:none}
+}
+@media (max-width:880px){
+  #main{flex-direction:column;overflow-y:auto}
+  aside{width:100%!important;max-height:230px;border-left:0!important;border-right:0!important;border-bottom:1px solid var(--line)}
+  #center{min-height:420px}
+  #topbar{gap:6px}
+}
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+
+<header id="topbar">
+  <div id="brand">
+    <span class="logo">🌊</span>
+    <span class="name">AeroThermal3D</span>
+    <span class="sub">CFD × CAD</span>
+  </div>
+  <span class="badge b-cpp">NAVIER–STOKES</span>
+  <span class="badge b-les">LES · SMAGORINSKY</span>
+  <span class="badge b-omp">BOUSSINESQ</span>
+  <span class="badge b-simd">ABL WIND</span>
+  <div class="spacer"></div>
+  <div class="seg" id="modeSeg">
+    <button id="btnModeDesign" class="design">✏️ Design</button>
+    <button id="btnModeSim">🌊 Simulation</button>
+  </div>
+  <div class="seg" id="viewSeg">
+    <button id="btnView2D" class="on">▤ Plan 2D</button>
+    <button id="btnView3D">◎ 3D Orbit</button>
+  </div>
+  <button class="tbtn accent" id="btnPlay" title="Run / pause the solver (Simulation mode)">⏸ <span id="playLabel">Running</span></button>
+  <button class="tbtn" id="btnReset" title="Reset fields to ambient state">⟲ Reset</button>
+  <div class="spacer"></div>
+  <select class="tbtn" id="selPreset" title="Load a pre-built architectural preset">
+    <option value="">📁 Presets…</option>
+    <option value="studio">Studio Apartment</option>
+    <option value="crossvent">Cross-Vent Office</option>
+    <option value="windtest">Wind Tunnel Test Hut</option>
+    <option value="clear">🗑 Empty Domain</option>
+  </select>
+  <button class="tbtn" id="btnExport" title="Export blueprint as JSON">⬇ Export .json</button>
+  <button class="tbtn" id="btnImport" title="Import blueprint from JSON">⬆ Import .json</button>
+  <button class="tbtn warn" id="btnVTK" title="Export current fields as ParaView legacy VTK">🧊 VTK Export</button>
+  <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+</header>
+
+<div id="main">
+  <!-- ================= LEFT: TOOLS + PROPERTIES ================= -->
+  <aside class="left">
+    <div class="sec" id="toolsSec">
+      <h3>✏️ CAD Tools</h3>
+      <div id="toolGrid">
+        <div class="tool on" data-tool="select"><span class="ic">🖱️</span>Select</div>
+        <div class="tool" data-tool="wall"><span class="ic">🧱</span>Wall</div>
+        <div class="tool" data-tool="window"><span class="ic">🪟</span>Window</div>
+        <div class="tool" data-tool="door"><span class="ic">🚪</span>Door</div>
+        <div class="tool" data-tool="dummy"><span class="ic">🧍</span>Dummy 6ft</div>
+        <div class="tool danger" data-tool="delete"><span class="ic">🗑️</span>Delete</div>
+      </div>
+    </div>
+
+    <div class="sec" id="propsSec">
+      <h3>🔍 Property Inspector</h3>
+      <div id="propsPanel"><div class="noSel">Select an object in <b>Design</b> mode to inspect and edit its properties.<br><br>Walls are extruded to the fixed <b>2.80 m</b> ceiling.</div></div>
+    </div>
+
+    <div class="sec" id="simInfoSec" style="display:none">
+      <h3>🌊 Solver Monitor</h3>
+      <div id="simInfoPanel">
+        <div class="kv"><span>Sim time</span><span id="siTime">0.00 s</span></div>
+        <div class="kv"><span>Steps / frame</span><span id="siSteps">–</span></div>
+        <div class="kv"><span>Solve rate</span><span id="siRate">–</span></div>
+        <div class="kv"><span>Grid cells</span><span id="siCells">–</span></div>
+        <div class="kv"><span>Fluid / solid</span><span id="siFluid">–</span></div>
+        <div class="kv hot"><span>Max |u|</span><span id="siUmax">–</span></div>
+        <div class="kv hot"><span>Δt (CFL)</span><span id="siDt">–</span></div>
+        <div class="kv"><span>T range</span><span id="siTrange">–</span></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>📖 Model</h3>
+      <div id="modelStats" style="font-size:11.5px;color:var(--txt2);line-height:1.8;font-variant-numeric:tabular-nums">
+        <div>Walls: <b id="msWalls" style="color:#9fd8f7">0</b> · Windows: <b id="msWins" style="color:#9fd8f7">0</b></div>
+        <div>Doors: <b id="msDoors" style="color:#9fd8f7">0</b> · Occupants: <b id="msDum" style="color:#9fd8f7">0</b></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= CENTER VIEWPORT ================= -->
+  <div id="center">
+    <div id="view2d" class="view on"><canvas id="c2d"></canvas></div>
+    <div id="view3d" class="view"><canvas id="c3d"></canvas><div id="webglErr"></div></div>
+    <div id="viewBadge"><b id="vbMode">DESIGN</b><span id="vbInfo">Floor plan — 1 m grid</span></div>
+    <div id="sliceBadge" style="display:none">slice y = <b id="sbVal">1.50</b> m</div>
+    <div id="modeOverlay" class="design">✏️ DESIGN MODE — GEOMETRY EDITABLE</div>
+    <div id="probeTip"></div>
+    <div id="legend" class="hidden">
+      <div id="legTitle">Temperature °C</div>
+      <div id="legBar"></div>
+      <div id="legTicks"><span id="legMin">0</span><span id="legMid"></span><span id="legMax">1</span></div>
+    </div>
+  </div>
+
+  <!-- ================= RIGHT: ENVIRONMENT + VIS + SOLVER ================= -->
+  <aside class="right">
+    <div class="sec">
+      <h3>🌍 Atmosphere <span class="n">ABL</span></h3>
+      <div class="row"><label>Ambient T</label><input type="range" id="inTamb" min="-10" max="45" step="0.5" value="22"><span class="val" id="inTambVal">22.0 °C</span></div>
+      <div class="row"><label>Wind U<sub>ref</sub></label><input type="range" id="inUref" min="0" max="12" step="0.1" value="3.0"><span class="val" id="inUrefVal">3.0 m/s</span></div>
+      <div class="row"><label>Shear α</label><input type="range" id="inAlpha" min="0.10" max="0.40" step="0.01" value="0.20"><span class="val" id="inAlphaVal">0.20</span></div>
+      <div class="row" style="margin-bottom:2px"><label>Azimuth</label><input type="range" id="inAz" min="0" max="360" step="1" value="0"><span class="val" id="inAzVal">0°</span></div>
+      <div class="row" style="justify-content:flex-end;margin-top:0">
+        <div id="azWrap">
+          <div id="azDial"><span class="N">N</span><div id="azArrow">➤</div></div>
+          <div style="font-size:10.5px;color:var(--txt3);line-height:1.5">wind vector<br>in plan view<br><span style="color:var(--txt2)">0° = toward +X (E)</span></div>
+        </div>
+      </div>
+      <div id="envReadout"></div>
+    </div>
+
+    <div class="sec">
+      <h3>🎨 Visualization</h3>
+      <div class="row"><label>Quantity</label>
+        <select class="inp" id="selQuantity" style="width:150px">
+          <option value="T" selected>Temperature</option>
+          <option value="speed">Velocity magnitude</option>
+          <option value="vort">Vertical vorticity</option>
+          <option value="p">Pressure</option>
+        </select></div>
+      <div class="row"><label>Colormap</label>
+        <select class="inp" id="selCmap" style="width:150px">
+          <option value="turbo" selected>Turbo</option>
+          <option value="coolwarm">Cool → Warm</option>
+          <option value="viridis">Viridis</option>
+          <option value="inferno">Inferno</option>
+        </select></div>
+      <div class="row"><label>Slice plane</label>
+        <select class="inp" id="selSliceMode" style="width:150px">
+          <option value="top" selected>Top (X–Z @ y)</option>
+          <option value="front">Front (X–Y @ z)</option>
+          <option value="side">Side (Z–Y @ x)</option>
+        </select></div>
+      <div class="row"><label>Slice pos</label><input type="range" id="inSlice" min="0" max="1" step="0.005" value="0.5"><span class="val" id="inSliceVal">–</span></div>
+      <label class="chkrow"><input type="checkbox" id="chkGlyphs" checked> Velocity glyphs</label>
+      <div class="row"><label>Glyph density</label><input type="range" id="inGlyphDens" min="1" max="4" step="1" value="2"><span class="val" id="inGlyphDensVal">2</span></div>
+      <label class="chkrow"><input type="checkbox" id="chkStream" checked> Animated streamlines</label>
+      <label class="chkrow"><input type="checkbox" id="chkParts" checked> 3D particle streamlines</label>
+      <label class="chkrow"><input type="checkbox" id="chkSlicePlane" checked> 3D slice plane</label>
+      <label class="chkrow"><input type="checkbox" id="chkWalls3d" checked> Show building shell</label>
+    </div>
+
+    <div class="sec">
+      <h3>⚙️ Solver <span class="n">NS</span></h3>
+      <div class="row"><label>Resolution</label>
+        <select class="inp" id="selRes" style="width:150px">
+          <option value="0.40">Low · dx 0.40 m</option>
+          <option value="0.30" selected>Medium · dx 0.30 m</option>
+          <option value="0.24">High · dx 0.24 m</option>
+        </select></div>
+      <div class="row"><label>Substeps</label><input type="range" id="inSubsteps" min="1" max="8" step="1" value="3"><span class="val" id="inSubstepsVal">3</span></div>
+      <div class="row"><label>Pressure iters</label><input type="range" id="inPiters" min="8" max="40" step="1" value="20"><span class="val" id="inPitersVal">20</span></div>
+      <div id="solverNote" style="font-size:10.5px;color:var(--txt3);line-height:1.55;margin-top:4px">
+        Projection method · semi-Lagrangian advection · Smagorinsky-Lilly LES (Cs 0.12, van Driest damping) · explicit diffusion · Jacobi pressure solve.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer id="statusbar">
+  <span id="statHint">Ready.</span>
+  <span class="stat">t = <b id="statTime">0.00</b> s</span>
+  <span class="stat"><b id="statSps">0</b> steps/s</span>
+  <span class="stat"><b id="statMs">0</b> ms/frame</span>
+  <span class="stat hot">CFL <b id="statCfl">–</b></span>
+  <span class="stat"><b id="statCells">0</b> cells</span>
+</footer>
+
+<div id="toast"></div>
+
+<script type="module">
+"use strict";
+/* ============================================================
+   AeroThermal3D — single-file CFD + CAD engine
+   3D unsteady incompressible Navier-Stokes + Boussinesq
+   + Smagorinsky-Lilly LES + ABL power-law wind profile
+   ============================================================ */
+
+/* ============================================================
+   §0  CONSTANTS & UTILITIES
+   ============================================================ */
+const ROOM_H   = 2.80;                 // fixed ceiling height [m]
+const DOOR_H   = 2.10;                 // door leaf height [m]
+const DUMMY_H  = 1.83;                 // 6-foot occupant [m]
+const DUMMY_T  = 37.0;                 // occupant skin temp [°C]
+const DUMMY_W  = 90;                   // sensible metabolic heat [W]
+const GRID_MAX = 20.0;                 // domain hard limit [m]
+
+const RHO0   = 1.164;                  // reference air density [kg/m³]
+const NU     = 1.62e-5;                // kinematic viscosity [m²/s]
+const ALPHA_T= 2.25e-5;                // thermal diffusivity [m²/s]
+const PR_T   = 0.85;                   // turbulent Prandtl
+const CS     = 0.12;                   // Smagorinsky constant
+const KARMAN = 0.41;                   // von Kármán
+const GY     = -9.81;                  // gravity [m/s²]
+const CP_AIR = 1005;                   // specific heat [J/(kg·K)]
+const Y_REF  = 10.0;                   // ABL reference height [m]
+const VONK   = 0.41;
+
+const clamp = (v,a,b)=> v<a?a : v>b?b : v;
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const smooth= t=> t*t*(3-2*t);
+const fmt   = (v,d=2)=> (v===undefined||v===null||!isFinite(v))?"–":v.toFixed(d);
+const deg   = r=> r*180/Math.PI;
+const rad   = d=> d*Math.PI/180;
+const $id   = id=> document.getElementById(id);
+
+let toastTimer=null;
+function toast(msg, err=false){
+  const t=$id("toast"); t.textContent=msg;
+  t.className = err? "show err" : "show";
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{ t.className=""; }, 2600);
+}
+
+/* ============================================================
+   §1  COLORMAPS  (turbo, coolwarm, viridis, inferno)
+   ============================================================ */
+function lerpStops(stops, t){
+  t = clamp(t,0,1);
+  const n = stops.length-1, f = t*n, i = Math.min(n-1, Math.floor(f)), u = f-i;
+  const a = stops[i], b = stops[i+1];
+  return [a[0]+(b[0]-a[0])*u, a[1]+(b[1]-a[1])*u, a[2]+(b[2]-a[2])*u];
+}
+const CMAPS = {
+  turbo: [[0.19,0.07,0.23],[0.28,0.14,0.51],[0.12,0.34,0.74],[0.12,0.59,0.83],[0.25,0.82,0.47],[0.61,0.90,0.12],[0.98,0.89,0.14],[0.98,0.55,0.03],[0.85,0.12,0.06]],
+  coolwarm: [[0.23,0.30,0.75],[0.47,0.60,0.92],[0.77,0.85,0.98],[0.94,0.94,0.94],[0.99,0.74,0.61],[0.94,0.36,0.29],[0.60,0.10,0.20]],
+  viridis: [[0.267,0.005,0.329],[0.283,0.141,0.458],[0.254,0.265,0.530],[0.208,0.372,0.553],[0.164,0.471,0.558],[0.128,0.567,0.551],[0.135,0.659,0.518],[0.267,0.749,0.441],[0.478,0.821,0.318],[0.741,0.873,0.150],[0.993,0.906,0.144]],
+  inferno: [[0.001,0.000,0.014],[0.08,0.03,0.22],[0.26,0.06,0.42],[0.47,0.11,0.47],[0.67,0.21,0.42],[0.85,0.38,0.31],[0.97,0.60,0.21],[0.99,0.81,0.15],[0.99,0.96,0.74]],
+};
+function cmapRGB(name,t){
+  const c = lerpStops(CMAPS[name]||CMAPS.turbo, t);
+  return [c[0]*255|0, c[1]*255|0, c[2]*255|0];
+}
+function cssRGB(name,t){ const c=cmapRGB(name,t); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+function cmapGradientCSS(name){
+  const n=16, parts=[];
+  for(let i=0;i<=n;i++) parts.push(`${cssRGB(name,i/n)} ${(i/n*100).toFixed(1)}%`);
+  return `linear-gradient(90deg, ${parts.join(",")})`;
+}
+
+/* ============================================================
+   §2  GEOMETRY MODEL  (walls / windows / doors / dummies)
+   ============================================================ */
+let nextId = 1;
+function mkId(){ return nextId++; }
+
+/* Wall: axis-aligned segment. horiz=true → along X (x1..x2 at z),
+        horiz=false → along Z (z1..z2 at x). thickness in m. */
+function makeWall(horiz, fixed, a, b, thickness=0.18){
+  return { id:mkId(), type:"wall", horiz, fixed, a, b, th:thickness };
+}
+/* Window: sits on a wall host. s = horizontal offset along host from its start,
+   width, sill height (y0), height h, open ∈ [0,1] → casement angle θ=open×90° */
+function makeWindow(hostId, s, width=1.2, y0=1.0, h=1.2, open=0.5){
+  return { id:mkId(), type:"window", host:hostId, s, w:width, y0, h, open };
+}
+/* Door: door leaf height fixed 2.10 m unless custom; swing = 'in+'|'in-'|'out+'|'out-' quadrant */
+function makeDoor(hostId, s, width=0.9, h=DOOR_H, open=0.5, swing="in+"){
+  return { id:mkId(), type:"door", host:hostId, s, w:width, h, open, swing };
+}
+function makeDummy(x, z){
+  return { id:mkId(), type:"dummy", x, z };
+}
+
+const world = { walls:[], windows:[], doors:[], dummies:[] };
+
+function wallEndpoints(w){
+  return w.horiz ? {x1:w.a, z1:w.fixed, x2:w.b, z2:w.fixed}   // along X at z=fixed
+                 : {x1:w.fixed, z1:w.a, x2:w.fixed, z2:w.b};  // along Z at x=fixed
+}
+function wallLength(w){ return Math.abs(w.b - w.a); }
+
+/* window/door world-space footprint along its host wall */
+function openingSpan(host, s, w){
+  const p = wallEndpoints(host);
+  const t0 = clamp(s, 0, wallLength(host));
+  const t1 = clamp(s + w, 0, wallLength(host));
+  const horizontal = (p.z1 === p.z2);           // wall along X
+  if(horizontal){
+    const zc = p.z1;
+    return { horiz:true, z:zc, x1:Math.min(p.x1,p.x2)+Math.min(t0,t1), x2:Math.min(p.x1,p.x2)+Math.max(t0,t1) };
+  }else{
+    const xc = p.x1;
+    return { horiz:false, x:xc, z1:Math.min(p.z1,p.z2)+Math.min(t0,t1), z2:Math.min(p.z1,p.z2)+Math.max(t0,t1) };
+  }
+}
+
+function objectById(id){
+  for(const w of world.walls)   if(w.id===id) return w;
+  for(const o of world.windows) if(o.id===id) return o;
+  for(const d of world.doors)   if(d.id===id) return d;
+  for(const m of world.dummies) if(m.id===id) return m;
+  return null;
+}
+function hostOf(o){ return o && o.host!=null ? world.walls.find(w=>w.id===o.host) : null; }
+function removeObject(id){
+  const rm=(arr)=>{ const i=arr.findIndex(o=>o.id===id); if(i>=0){arr.splice(i,1); return true;} return false; };
+  if(rm(world.walls)){
+    world.windows = world.windows.filter(o=>o.host!==id);
+    world.doors   = world.doors.filter(o=>o.host!==id);
+    return true;
+  }
+  return rm(world.windows)||rm(world.doors)||rm(world.dummies);
+}
+function modelStats(){
+  return { walls:world.walls.length, wins:world.windows.length,
+           doors:world.doors.length, dummies:world.dummies.length };
+}
+function worldBounds(){
+  let x0=2e9,z0=2e9,x1=-2e9,z1=-2e9;
+  for(const w of world.walls){
+    const p=wallEndpoints(w);
+    x0=Math.min(x0,p.x1,p.x2); x1=Math.max(x1,p.x1,p.x2);
+    z0=Math.min(z0,p.z1,p.z2); z1=Math.max(z1,p.z1,p.z2);
+  }
+  if(x0>x1){ x0=0; x1=6; z0=0; z1=6; }
+  const m=1.6;
+  return { x0:Math.max(-GRID_MAX,x0-m), z0:Math.max(-GRID_MAX,z0-m),
+           x1:Math.min(GRID_MAX,x1+m), z1:Math.min(GRID_MAX,z1+m) };
+}
+
+/* ============================================================
+   §3  ENVIRONMENT + APP STATE
+   ============================================================ */
+const env = {
+  Tamb: 22.0,     // ambient [°C]
+  Uref: 3.0,      // reference wind speed at 10 m [m/s]
+  az: 0,          // azimuth [deg] — 0 = wind blows toward +X
+  alpha: 0.20,    // power-law exponent
+};
+const view = {
+  mode:"design",        // design | sim
+  pane:"2d",            // 2d | 3d
+  quantity:"T",         // T | speed | vort | p
+  cmap:"turbo",
+  sliceMode:"top",      // top | front | side
+  slicePos:0.5,         // normalized
+  glyphs:true, glyphDens:2,
+  streamlines:true,
+  particles:true, slicePlane3d:true, walls3d:true,
+  playing:false,
+};
+const solverCfg = { dx:0.30, substeps:3, piters:20 };
+
+/* ABL inflow speed at height y with direction applied */
+function ablWind(y){
+  const uu = env.Uref * Math.pow(Math.max(y,0.1)/Y_REF, env.alpha);
+  const a = rad(env.az);
+  return { x: uu*Math.cos(a), z: uu*Math.sin(a) };
+}
+
+/* ============================================================
+   §4  PRESETS
+   ============================================================ */
+const PRESETS = {
+  studio: { name:"Studio Apartment", make(){
+    const W=[
+      makeWall(true, 0.0, 0.0, 7.2),   // south (z=0), along X
+      makeWall(true, 5.0, 0.0, 7.2),   // north
+      makeWall(false, 0.0, 0.0, 5.0),  // west
+      makeWall(false, 7.2, 0.0, 5.0),  // east
+      makeWall(false, 4.3, 2.0, 5.0),  // bathroom partition
+      makeWall(true, 2.0, 4.3, 7.2),   // partition along X at z=2.0..? (door gap via opening)
+    ];
+    const WIN=[ makeWindow(W[0].id, 1.4, 1.6, 0.95, 1.35, 0.55),
+                makeWindow(W[1].id, 0.8, 1.2, 0.95, 1.35, 0.30),
+                makeWindow(W[3].id, 2.9, 1.0, 1.10, 1.00, 0.85) ];
+    const DOOR=[ makeDoor(W[4].id, 0.8, 0.85, DOOR_H, 0.35, "in+") ];
+    const DUM=[ makeDummy(2.1, 3.1), makeDummy(5.4, 1.4) ];
+    return {W,WIN,DOOR,DUM};
+  }},
+  crossvent: { name:"Cross-Vent Office", make(){
+    const W=[
+      makeWall(true, 0.0, 0.0, 9.0),
+      makeWall(true, 4.8, 0.0, 9.0),
+      makeWall(false, 0.0, 0.0, 4.8),
+      makeWall(false, 9.0, 0.0, 4.8),
+      makeWall(false, 5.6, 0.0, 4.8),   // meeting room partition
+    ];
+    const WIN=[ makeWindow(W[0].id, 2.4, 2.0, 0.90, 1.40, 0.70),
+                makeWindow(W[0].id, 5.4, 1.6, 0.90, 1.40, 0.70),
+                makeWindow(W[1].id, 2.0, 1.8, 0.90, 1.40, 0.70),
+                makeWindow(W[1].id, 5.8, 1.4, 0.90, 1.40, 0.70),
+                makeWindow(W[4].id, 2.6, 1.2, 0.90, 1.40, 0.35) ];
+    const DOOR=[ makeDoor(W[4].id, 0.6, 0.95, DOOR_H, 0.55, "out-"),
+                 makeDoor(W[2].id, 1.8, 1.0, DOOR_H, 1.0, "in+") ];
+    const DUM=[ makeDummy(2.0, 2.5), makeDummy(3.6, 1.2), makeDummy(7.4, 3.4), makeDummy(6.2, 1.6) ];
+    return {W,WIN,DOOR,DUM};
+  }},
+  windtest: { name:"Wind Tunnel Test Hut", make(){
+    const W=[
+      makeWall(true, 0.0, 0.0, 8.0),
+      makeWall(true, 4.0, 0.0, 8.0),
+      makeWall(false, 0.0, 0.0, 4.0),
+      makeWall(false, 8.0, 0.0, 4.0),
+    ];
+    const WIN=[ makeWindow(W[2].id, 1.5, 1.6, 1.0, 1.2, 1.0),
+                makeWindow(W[3].id, 1.5, 1.6, 1.0, 1.2, 0.0),
+                makeWindow(W[0].id, 3.2, 1.2, 1.4, 0.8, 0.5),
+                makeWindow(W[1].id, 3.2, 1.2, 1.4, 0.8, 1.0) ];
+    const DOOR=[];
+    const DUM=[ makeDummy(4.0, 2.0), makeDummy(2.2, 1.0), makeDummy(5.8, 3.0) ];
+    return {W,WIN,DOOR,DUM};
+  }},
+  clear: { name:"Empty Domain", make(){ return {W:[],WIN:[],DOOR:[],DUM:[]}; } },
+};
+
+function loadPreset(key){
+  const p = PRESETS[key]; if(!p) return;
+  const {W,WIN,DOOR,DUM} = p.make();
+  world.walls=W; world.windows=WIN; world.doors=DOOR; world.dummies=DUM;
+  selection.clear(); rebuildAll();
+  toast(`Loaded preset: ${p.name}`);
+}
+
+/* ============================================================
+   §5  IMPORT / EXPORT (blueprint JSON)
+   ============================================================ */
+function exportBlueprint(){
+  const j = {
+    format:"AeroThermal3D-blueprint", version:1,
+    ceilingHeight:ROOM_H, nextId,
+    env:{...env},
+    walls:world.walls.map(w=>({id:w.id,horiz:w.horiz,fixed:round3(w.fixed),a:round3(w.a),b:round3(w.b),th:round3(w.th)})),
+    windows:world.windows.map(o=>({id:o.id,host:o.host,s:round3(o.s),w:round3(o.w),y0:round3(o.y0),h:round3(o.h),open:o.open})),
+    doors:world.doors.map(o=>({id:o.id,host:o.host,s:round3(o.s),w:round3(o.w),h:round3(o.h),open:o.open,swing:o.swing})),
+    dummies:world.dummies.map(m=>({id:m.id,x:round3(m.x),z:round3(m.z)})),
+  };
+  return j;
+}
+function round3(v){ return Math.round(v*1000)/1000; }
+function importBlueprint(j){
+  if(!j || j.format!=="AeroThermal3D-blueprint") throw new Error("Not an AeroThermal3D blueprint");
+  world.walls   = (j.walls||[]).map(o=>({id:o.id,horiz:!!o.horiz,fixed:+o.fixed,a:+o.a,b:+o.b,th:+(o.th??0.18)}));
+  world.windows = (j.windows||[]).map(o=>({id:o.id,host:o.host,type:"window",s:+o.s,w:+o.w,y0:+o.y0,h:+o.h,open:clamp(+o.open||0,0,1)}));
+  world.doors   = (j.doors||[]).map(o=>({id:o.id,host:o.host,type:"door",s:+o.s,w:+o.w,h:+(o.h??DOOR_H),open:clamp(+o.open||0,0,1),swing:o.swing||"in+"}));
+  world.dummies = (j.dummies||[]).map(o=>({id:o.id,type:"dummy",x:+o.x,z:+o.z}));
+  if(j.env){ Object.assign(env, {Tamb:+j.env.Tamb||22, Uref:Math.abs(+j.env.Uref)||0,
+    az:((+j.env.az%360)+360)%360||0, alpha:clamp(+j.env.alpha||0.2,0.1,0.4)}); }
+  nextId = Math.max(1, j.nextId||1);
+  for(const c of [...world.walls,...world.windows,...world.doors,...world.dummies])
+    nextId = Math.max(nextId, c.id+1);
+  selection.clear();
+  rebuildAll();
+  syncEnvUI();
+}
+function downloadFile(name, text, mime="application/json"){
+  const blob = new Blob([text], {type:mime});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+
+/* ============================================================
+   §6  CFD SOLVER — 3D MAC grid, projection method
+   ============================================================
+   Staggered MAC grid: u at ±x faces, v at ±y faces, w at ±z faces,
+   p & T at cell centers. Solid mask from voxelized CAD geometry.
+   Index layouts:
+     cell/u-face: i + nx*(j + ny*k)      u: i∈[0,nx]
+     v-face:      i + nx*(j + (ny+1)*k)  v: j∈[0,ny]
+     w-face:      i + nx*(j + ny*k)      w: k∈[0,nz]  (buffer sized nx*ny*(nz+1))
+   ============================================================ */
+const solver = {
+  nx:0, ny:0, nz:0, dx:0.3, dy:0.3, dz:0.3,
+  x0:0, y0:0, z0:0,
+  u:null, v:null, w:null, u2:null, v2:null, w2:null,
+  p:null, div:null, T:null, T2:null, nuT:null, dw:null,
+  solid:null, srcT:null, uc:null, vc:null, wc:null,
+  t:0, steps:0, dt:0.04, umax:0.01, cfl:0, wallCells:0,
+  built:false, geomDirty:true,
+};
+
+function allocSolver(){
+  const s = solver;
+  const N  = s.nx*s.ny*s.nz;
+  const NU = (s.nx+1)*s.ny*s.nz;
+  const NV = s.nx*(s.ny+1)*s.nz;
+  const NW = s.nx*s.ny*(s.nz+1);
+  s.u=new Float32Array(NU); s.u2=new Float32Array(NU);
+  s.v=new Float32Array(NV); s.v2=new Float32Array(NV);
+  s.w=new Float32Array(NW); s.w2=new Float32Array(NW);
+  s.p=new Float32Array(N); s.div=new Float32Array(N);
+  s.T=new Float32Array(N); s.T2=new Float32Array(N);
+  s.nuT=new Float32Array(N); s.dw=new Float32Array(N);
+  s.solid=new Uint8Array(N); s.srcT=new Float32Array(N);
+  s.uc=new Float32Array(N); s.vc=new Float32Array(N); s.wc=new Float32Array(N);
+}
+const idx  = (i,j,k)=> i + solver.nx*(j + solver.ny*k);
+const idxU = (i,j,k)=> i + (solver.nx+1)*(j + solver.ny*k);
+const idxV = (i,j,k)=> i + solver.nx*(j + (solver.ny+1)*k);
+const idxW = (i,j,k)=> i + solver.nx*(j + solver.ny*k);
+
+function cellCenter(i,j,k){
+  const s=solver;
+  return { x:s.x0+(i+0.5)*s.dx, y:s.y0+(j+0.5)*s.dy, z:s.z0+(k+0.5)*s.dz };
+}
+function cellSolid(i,j,k){
+  const s=solver;
+  if(i<0||i>=s.nx||j<0||j>=s.ny||k<0||k>=s.nz) return false;
+  return s.solid[idx(i,j,k)]===1;
+}
+function faceSolidU(i,j,k){ return cellSolid(i-1,j,k) || cellSolid(i,j,k); }
+function faceSolidV(i,j,k){ return cellSolid(i,j-1,k) || cellSolid(i,j,k); }
+function faceSolidW(i,j,k){ return cellSolid(i,j,k-1) || cellSolid(i,j,k); }
+
+/* ---- build grid from world bounds ---- */
+function buildGrid(){
+  const s = solver;
+  const b = worldBounds();
+  const dx = solverCfg.dx;
+  s.dx=s.dy=s.dz=dx;
+  s.x0=b.x0; s.z0=b.z0; s.y0=0;
+  s.nx = clamp(Math.ceil((b.x1-b.x0)/dx), 8, 130);
+  s.ny = clamp(Math.ceil(ROOM_H/dx), 6, 60);
+  s.nz = clamp(Math.ceil((b.z1-b.z0)/dx), 8, 130);
+  allocSolver();
+  s.t=0; s.steps=0; s.built=true; s.geomDirty=true;
+  resetFields();
+}
+
+/* ---- voxelize CAD geometry into the solid mask ---- */
+function voxelize(){
+  const s=solver;
+  s.solid.fill(0);
+  const setSolid=(i,j,k)=>{ if(i>=0&&i<s.nx&&j>=0&&j<s.ny&&k>=0&&k<s.nz) s.solid[idx(i,j,k)]=1; };
+
+  // floor + ceiling slabs
+  for(let j=0;j<s.ny;j++){
+    const y=s.y0+(j+0.5)*s.dy;
+    const slab = (y<0.5*s.dy)||(y>ROOM_H-0.5*s.dy);
+    if(slab) for(let k=0;k<s.nz;k++) for(let i=0;i<s.nx;i++) setSolid(i,j,k);
+  }
+
+  // walls — vertical slabs through full ceiling height
+  for(const wl of world.walls){
+    const lo=Math.min(wl.a,wl.b), hi=Math.max(wl.a,wl.b);
+    const halfBand = wl.th/2 + 0.5*(wl.horiz?s.dz:s.dx);  // cover ≥1 cell row
+    for(let k=0;k<s.nz;k++) for(let i=0;i<s.nx;i++){
+      const c=cellCenter(i,0,k);
+      const coord = wl.horiz?c.x:c.z;   // along-wall coordinate
+      const line  = wl.horiz?c.z:c.x;   // wall centerline coordinate
+      if(coord<lo||coord>hi) continue;
+      if(Math.abs(line-wl.fixed)>halfBand) continue;
+      for(let j=0;j<s.ny;j++){
+        const y=s.y0+(j+0.5)*s.dy;
+        if(y<=ROOM_H) setSolid(i,j,k);
+      }
+    }
+  }
+
+  // carve window & door openings through their host wall band
+  const carveOpening=(o, y0, y1, keepOpen)=>{
+    const host=world.walls.find(w=>w.id===o.host); if(!host) return;
+    const span=openingSpan(host,o.s,o.w);
+    const aMin=Math.min(span.x1??span.z1, span.x2??span.z2);
+    const aMax=Math.max(span.x1??span.z1, span.x2??span.z2);
+    const halfBand=host.th/2+0.5*(span.horiz?s.dz:s.dx)+1e-9;
+    for(let k=0;k<s.nz;k++) for(let i=0;i<s.nx;i++){
+      const c=cellCenter(i,0,k);
+      const hit = span.horiz ? Math.abs(c.z-span.z)<=halfBand : Math.abs(c.x-span.x)<=halfBand;
+      if(!hit) continue;
+      const along = span.horiz?c.x:c.z;
+      if(along<aMin||along>aMax) continue;
+      for(let j=0;j<s.ny;j++){
+        const y=s.y0+(j+0.5)*s.dy;
+        if(y>=y0&&y<=y1) s.solid[idx(i,j,k)] = keepOpen?0:1;
+      }
+    }
+  };
+  // doors: open fraction opens the gap; closed door = solid full height
+  for(const o of world.doors) carveOpening(o, 0, o.h, o.open>0.02);
+  // windows: opening between sill and head; casement sash partially blocks
+  for(const o of world.windows){
+    const effective = o.open;                 // 0=closed … 1=fully open
+    carveOpening(o, o.y0, o.y0+o.h, effective>0.02);
+    if(effective>0.02 && effective<0.55){
+      // half-open casement: leave sash-edge cells solid (thin stripe) —
+      // approximate blockage by solidifying the last 40% of the opening span
+      const host=world.walls.find(w=>w.id===o.host);
+      const span=openingSpan(host,o.s,o.w);
+      const aMin=Math.min(span.x1??span.z1, span.x2??span.z2);
+      const aMax=Math.max(span.x1??span.z1, span.x2??span.z2);
+      const cut=aMax-0.4*(aMax-aMin);
+      const halfBand=host.th/2+0.5*(span.horiz?s.dz:s.dx)+1e-9;
+      for(let k=0;k<s.nz;k++) for(let i=0;i<s.nx;i++){
+        const c=cellCenter(i,0,k);
+        const hit = span.horiz ? Math.abs(c.z-span.z)<=halfBand : Math.abs(c.x-span.x)<=halfBand;
+        if(!hit) continue;
+        const along=span.horiz?c.x:c.z;
+        if(along<cut||along>aMax) continue;
+        for(let j=0;j<s.ny;j++){
+          const y=s.y0+(j+0.5)*s.dy;
+          if(y>=o.y0&&y<=o.y0+o.h) s.solid[idx(i,j,k)]=1;
+        }
+      }
+    }
+  }
+
+  // 6-ft occupant dummies: standing cylinders, r≈0.16 m
+  const R=0.16;
+  for(const m of world.dummies){
+    for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+      const c=cellCenter(i,j,k);
+      if(c.y>DUMMY_H) continue;
+      const dx=c.x-m.x, dz=c.z-m.z;
+      if(dx*dx+dz*dz <= (R+0.45*s.dx)*(R+0.45*s.dx)) setSolid(i,j,k);
+    }
+  }
+
+  s.wallCells=0;
+  for(let n=0;n<s.solid.length;n++) s.wallCells+=s.solid[n];
+  chamferDistance();
+}
+
+/* ---- multi-pass chamfer distance transform (cells to nearest solid) ---- */
+function chamferDistance(){
+  const s=solver, BIG=1e6;
+  const d=s.dw;
+  for(let n=0;n<d.length;n++) d[n]=s.solid[n]?0:BIG;
+  const I=s.nx, J=s.ny, K=s.nz;
+  const pass=(i0,i1,di,j0,j1,dj,k0,k1,dk)=>{
+    for(let k=k0;k!==k1;k+=dk) for(let j=j0;j!==j1;j+=dj) for(let i=i0;i!==i1;i+=di){
+      const n=idx(i,j,k);
+      let v=d[n];
+      if(i-di>=0&&i-di<I) v=Math.min(v, d[idx(i-di,j,k)]+1);
+      if(j-dj>=0&&j-dj<J) v=Math.min(v, d[idx(i,j-dj,k)]+1);
+      if(k-dk>=0&&k-dk<K) v=Math.min(v, d[idx(i,j,k-dk)]+1);
+      d[n]=v;
+    }
+  };
+  pass(0,I,1, 0,J,1, 0,K,1);
+  pass(I-1,-1,-1, J-1,-1,-1, K-1,-1,-1);
+  pass(I-1,-1,-1, J-1,-1,-1, 0,K,1);
+  pass(0,I,1, 0,J,1, K-1,-1,-1);
+}
+
+/* ---- reset to ambient state ---- */
+function resetFields(){
+  const s=solver;
+  s.T.fill(env.Tamb); s.T2.fill(env.Tamb);
+  s.p.fill(0); s.div.fill(0);
+  s.u.fill(0); s.v.fill(0); s.w.fill(0);
+  applyInflow();
+  s.t=0; s.steps=0;
+}
+
+/* ---- ABL power-law inflow on upwind domain faces ---- */
+function applyInflow(){
+  const s=solver;
+  const a=rad(env.az), wx=Math.cos(a)*env.Uref, wz=Math.sin(a)*env.Uref;
+  if(env.Uref<0.01) return;
+  for(let j=0;j<s.ny;j++){
+    const y=s.y0+(j+0.5)*s.dy;
+    const spd=Math.pow(Math.max(y,0.1)/Y_REF, env.alpha);
+    const ux=wx*spd, uz=wz*spd;
+    if(ux>0) for(let k=0;k<s.nz;k++) s.u[idxU(0,j,k)]=ux;
+    if(ux<0) for(let k=0;k<s.nz;k++) s.u[idxU(s.nx,j,k)]=ux;
+    if(uz>0) for(let i=0;i<s.nx;i++) s.w[idxW(i,j,0)]=uz;
+    if(uz<0) for(let i=0;i<s.nx;i++) s.w[idxW(i,j,s.nz)]=uz;
+  }
+}
+
+/* ============================================================
+   §7  SOLVER STEP
+   ============================================================ */
+function stepSolver(){
+  const s=solver;
+  if(!s.built) return;
+  if(s.geomDirty){ voxelize(); s.geomDirty=false; }
+
+  // adaptive dt (CFL)
+  let umax=1e-6;
+  for(let n=0;n<s.u.length;n++){ const a=Math.abs(s.u[n]); if(a>umax)umax=a; }
+  for(let n=0;n<s.v.length;n++){ const a=Math.abs(s.v[n]); if(a>umax)umax=a; }
+  for(let n=0;n<s.w.length;n++){ const a=Math.abs(s.w[n]); if(a>umax)umax=a; }
+  s.umax=umax;
+  const hmin=Math.min(s.dx,s.dy,s.dz);
+  const dt=clamp(0.45*hmin/Math.max(umax,0.08), 0.004, 0.06);
+  s.dt=dt; s.cfl=umax*dt/hmin;
+
+  computeCenterVel();
+  computeNuT();
+  advect(dt);
+  diffuseVel(dt);
+  addBuoyancy(dt);
+  project(dt);
+  thermalStep(dt);
+  applyInflow();
+
+  s.t+=dt; s.steps++;
+}
+
+/* center (collocated) velocities for strain & visualization */
+function computeCenterVel(){
+  const s=solver;
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    s.uc[n]=(s.u[idxU(i,j,k)]+s.u[idxU(i+1,j,k)])*0.5;
+    s.vc[n]=(s.v[idxV(i,j,k)]+s.v[idxV(i,j,Math.min(j+1,s.ny),k)])*0;
+    s.vc[n]=(s.v[idxV(i,j,k)]+s.v[idxV(i,j+1,k)])*0.5;
+    s.wc[n]=(s.w[idxW(i,j,k)]+s.w[idxW(i,j,k+1)])*0.5;
+  }
+}
+
+/* Smagorinsky-Lilly νt, filter length d_w = min(Δ, κ·y_w) */
+function computeNuT(){
+  const s=solver, dx=s.dx, cs2=CS*CS;
+  const g=(f,i,j,k)=>f[idx(clamp(i,0,s.nx-1),clamp(j,0,s.ny-1),clamp(k,0,s.nz-1))];
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    if(s.solid[n]){ s.nuT[n]=0; continue; }
+    const dudx=(g(s.uc,i+1,j,k)-g(s.uc,i-1,j,k))/(2*dx);
+    const dudy=(g(s.uc,i,j+1,k)-g(s.uc,i,j-1,k))/(2*dx);
+    const dudz=(g(s.uc,i,j,k+1)-g(s.uc,i,j,k-1))/(2*dx);
+    const dvdx=(g(s.vc,i+1,j,k)-g(s.vc,i-1,j,k))/(2*dx);
+    const dvdy=(g(s.vc,i,j+1,k)-g(s.vc,i,j-1,k))/(2*dx);
+    const dvdz=(g(s.vc,i,j,k+1)-g(s.vc,i,j,k-1))/(2*dx);
+    const dwdx=(g(s.wc,i+1,j,k)-g(s.wc,i-1,j,k))/(2*dx);
+    const dwdy=(g(s.wc,i,j+1,k)-g(s.wc,i,j-1,k))/(2*dx);
+    const dwdz=(g(s.wc,i,j,k+1)-g(s.wc,i,j,k-1))/(2*dx);
+    const S2 = 2*(dudx*dudx+dvdy*dvdy+dwdz*dwdz)
+             + (dudy+dvdx)*(dudy+dvdx)
+             + (dudz+dwdx)*(dudz+dwdx)
+             + (dvdz+dwdy)*(dvdz+dwdy);
+    const SMag=Math.sqrt(Math.max(S2,1e-8));
+    const yw=s.dw[n]*dx;                     // wall distance [m]
+    const dw=Math.min(dx, KARMAN*yw);        // Mason/van Driest filtered length
+    s.nuT[n]=cs2*dw*dw*SMag;
+  }
+}
+
+/* generic trilinear sampler factory for any staggered layout */
+function makeSampler(f,nxi,nyi,nzi,ox,oy,oz){
+  const s=solver;
+  return (x,y,z)=>{
+    const gx=(x-s.x0)/s.dx-0.5-ox, gy=(y-s.y0)/s.dy-0.5-oy, gz=(z-s.z0)/s.dz-0.5-oz;
+    const i0=clamp(Math.floor(gx),0,nxi-1), i1=Math.min(i0+1,nxi-1), fx=clamp(gx-i0,0,1);
+    const j0=clamp(Math.floor(gy),0,nyi-1), j1=Math.min(j0+1,nyi-1), fy=clamp(gy-j0,0,1);
+    const k0=clamp(Math.floor(gz),0,nzi-1), k1=Math.min(k0+1,nzi-1), fz=clamp(gz-k0,0,1);
+    const L=lerp, q=(i,j,k)=>f[i+nxi*(j+nyi*k)];
+    return L( L(L(q(i0,j0,k0),q(i1,j0,k0),fx), L(q(i0,j1,k0),q(i1,j1,k0),fx), fy),
+              L(L(q(i0,j0,k1),q(i1,j0,k1),fx), L(q(i0,j1,k1),q(i1,j1,k1),fx), fy), fz);
+  };
+}
+
+/* semi-Lagrangian advection */
+function advect(dt){
+  const s=solver;
+  const su=makeSampler(s.u,s.nx+1,s.ny,s.nz,-0.5,0,0);
+  const sv=makeSampler(s.v,s.nx,s.ny+1,s.nz,0,-0.5,0);
+  const sw=makeSampler(s.w,s.nx,s.ny,s.nz+1,0,0,-0.5);
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<=s.nx;i++){
+    const n=idxU(i,j,k);
+    if(faceSolidU(i,j,k)||cellSolid(i,j,k)&&cellSolid(i-1,j,k)){ s.u2[n]=0; continue; }
+    const x=s.x0+i*s.dx, y=s.y0+(j+0.5)*s.dy, z=s.z0+(k+0.5)*s.dz;
+    const uu=su(x,y,z), vv=sv(x,y,z), ww=sw(x,y,z);
+    s.u2[n]=su(x-uu*dt,y-vv*dt,z-ww*dt);
+  }
+  for(let k=0;k<s.nz;k++) for(let j=0;j<=s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idxV(i,j,k);
+    if(faceSolidV(i,j,k)){ s.v2[n]=0; continue; }
+    const x=s.x0+(i+0.5)*s.dx, y=s.y0+j*s.dy, z=s.z0+(k+0.5)*s.dz;
+    const uu=su(x,y,z), vv=sv(x,y,z), ww=sw(x,y,z);
+    s.v2[n]=sv(x-uu*dt,y-vv*dt,z-ww*dt);
+  }
+  for(let k=0;k<=s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idxW(i,j,k);
+    if(faceSolidW(i,j,k)){ s.w2[n]=0; continue; }
+    const x=s.x0+(i+0.5)*s.dx, y=s.y0+(j+0.5)*s.dy, z=s.z0+k*s.dz;
+    const uu=su(x,y,z), vv=sv(x,y,z), ww=sw(x,y,z);
+    s.w2[n]=sw(x-uu*dt,y-vv*dt,z-ww*dt);
+  }
+  s.u.set(s.u2); s.v.set(s.v2); s.w.set(s.w2);
+}
+
+/* explicit diffusion with ν+νt */
+function diffuseVel(dt){
+  const s=solver;
+  const cf=dt/(s.dx*s.dx);
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<=s.nx;i++){
+    const n=idxU(i,j,k);
+    if(faceSolidU(i,j,k)){ continue; }
+    const nuF=(nuEff(i,j,k)+nuEff(Math.max(i-1,0),j,k))*0.5;
+    const lap=(fU(i+1,j,k)+fU(i-1,j,k)+fU(i,j+1,k)+fU(i,j-1,k)+fU(i,j,k+1)+fU(i,j,k-1)-6*s.u[n]);
+    s.u[n]+=nuF*cf*lap;
+  }
+  for(let k=0;k<s.nz;k++) for(let j=0;j<=s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idxV(i,j,k);
+    if(faceSolidV(i,j,k)) continue;
+    const nuF=(nuEff(i,clamp(j,0,s.ny-1),k)+nuEff(i,clamp(j-1,0,s.ny-1),k))*0.5;
+    const lap=(fV(i+1,j,k)+fV(i-1,j,k)+fV(i,j+1,k)+fV(i,j-1,k)+fV(i,j,k+1)+fV(i,j,k-1)-6*s.v[n]);
+    s.v[n]+=nuF*cf*lap;
+  }
+  for(let k=0;k<=s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idxW(i,j,k);
+    if(faceSolidW(i,j,k)) continue;
+    const nuF=(nuEff(i,j,clamp(k,0,s.nz-1))+nuEff(i,j,clamp(k-1,0,s.nz-1)))*0.5;
+    const lap=(fW(i+1,j,k)+fW(i-1,j,k)+fW(i,j+1,k)+fW(i,j-1,k)+fW(i,j,k+1)+fW(i,j,k-1)-6*s.w[n]);
+    s.w[n]+=nuF*cf*lap;
+  }
+}
+function nuEff(i,j,k){ const s=solver; return NU + s.nuT[idx(clamp(i,0,s.nx-1),clamp(j,0,s.ny-1),clamp(k,0,s.nz-1))]; }
+function fU(i,j,k){ const s=solver; if(i<0||i>s.nx||j<0||j>=s.ny||k<0||k>=s.nz) return 0; return s.u[idxU(i,j,k)]; }
+function fV(i,j,k){ const s=solver; if(i<0||i>=s.nx||j<0||j>s.ny||k<0||k>=s.nz) return 0; return s.v[idxV(i,j,k)]; }
+function fW(i,j,k){ const s=solver; if(i<0||i>=s.nx||j<0||j>=s.ny||k<0||k>s.nz) return 0; return s.w[idxW(i,j,k)]; }
+
+/* Boussinesq buoyancy + metabolic heat source assembly */
+function addBuoyancy(dt){
+  const s=solver;
+  const beta=1/Math.max(env.Tamb+273.15,250);
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    // v-faces above the cell
+    if(j<s.ny && !faceSolidV(i,j+1,k) && !s.solid[n]){
+      s.v[idxV(i,j+1,k)] += beta*(s.T[n]-env.Tamb)*GY*dt;
+    }
+  }
+  // volumetric heat sources from occupants
+  s.srcT.fill(0);
+  const R=0.20;
+  for(const m of world.dummies){
+    const cells=[];
+    for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+      const c=cellCenter(i,j,k);
+      if(c.y>DUMMY_H) continue;
+      const dx=c.x-m.x, dz=c.z-m.z;
+      if(dx*dx+dz*dz<=R*R) cells.push(idx(i,j,k));
+    }
+    if(cells.length){
+      const q=DUMMY_W/(cells.length*s.dx*s.dy*s.dz);   // W/m³
+      for(const n of cells) s.srcT[n]=q;
+    }
+  }
+}
+
+/* Jacobi pressure projection */
+function project(dt){
+  const s=solver;
+  // divergence (faces at solids carry 0 velocity → no-flux)
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    if(s.solid[n]){ s.div[n]=0; continue; }
+    s.div[n]=((s.u[idxU(i+1,j,k)]-s.u[idxU(i,j,k)])
+             +(s.v[idxV(i,j+1,k)]-s.v[idxV(i,j,k)])
+             +(s.w[idxW(i,j,k+1)]-s.w[idxW(i,j,k)]))/s.dx;
+  }
+  // Jacobi iterations for ∇²p = div/dt  (Neumann at solids, open at domain edges)
+  const iters=solverCfg.piters;
+  s.p.fill(0);
+  const pNew=new Float32Array(s.p.length);
+  const rhs=1/dt;
+  for(let it=0;it<iters;it++){
+    for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+      const n=idx(i,j,k);
+      if(s.solid[n]){ pNew[n]=0; continue; }
+      const pm = (i>0)?(s.solid[idx(i-1,j,k)]?s.p[n]:s.p[idx(i-1,j,k)]):0;
+      const pp = (i<s.nx-1)?(s.solid[idx(i+1,j,k)]?s.p[n]:s.p[idx(i+1,j,k)]):0;
+      const qm = (j>0)?(s.solid[idx(i,j-1,k)]?s.p[n]:s.p[idx(i,j-1,k)]):0;
+      const qp = (j<s.ny-1)?(s.solid[idx(i,j+1,k)]?s.p[n]:s.p[idx(i,j+1,k)]):0;
+      const rm = (k>0)?(s.solid[idx(i,j,k-1)]?s.p[n]:s.p[idx(i,j,k-1)]):0;
+      const rp = (k<s.nz-1)?(s.solid[idx(i,j,k+1)]?s.p[n]:s.p[idx(i,j,k+1)]):0;
+      pNew[n]=(pm+pp+qm+qp+rm+rp - s.div[n]*rhs*s.dx*s.dx)/6;
+    }
+    s.p.set(pNew);
+  }
+  // subtract ∇p (mirror p at solids / open edges)
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    if(s.solid[n]) continue;
+    const pL=(i>0)?(s.solid[idx(i-1,j,k)]?s.p[n]:s.p[idx(i-1,j,k)]):s.p[n];
+    const pR=(i<s.nx-1)?(s.solid[idx(i+1,j,k)]?s.p[n]:s.p[idx(i+1,j,k)]):s.p[n];
+    const pB=(j>0)?(s.solid[idx(i,j-1,k)]?s.p[n]:s.p[idx(i,j-1,k)]):s.p[n];
+    const pT=(j<s.ny-1)?(s.solid[idx(i,j+1,k)]?s.p[n]:s.p[idx(i,j+1,k)]):s.p[n];
+    const pK=(k>0)?(s.solid[idx(i,j,k-1)]?s.p[n]:s.p[idx(i,j,k-1)]):s.p[n];
+    const pF=(k<s.nz-1)?(s.solid[idx(i,j,k+1)]?s.p[n]:s.p[idx(i,j,k+1)]):s.p[n];
+    if(!faceSolidU(i,j,k))   s.u[idxU(i,j,k)]   -= dt*(s.p[n]-pL)/s.dx;
+    if(!faceSolidU(i+1,j,k)) s.u[idxU(i+1,j,k)] -= dt*(pR-s.p[n])/s.dx;
+    if(!faceSolidV(i,j,k))   s.v[idxV(i,j,k)]   -= dt*(s.p[n]-pB)/s.dy;
+    if(!faceSolidV(i,j+1,k)) s.v[idxV(i,j+1,k)] -= dt*(pT-s.p[n])/s.dy;
+    if(!faceSolidW(i,j,k))   s.w[idxW(i,j,k)]   -= dt*(s.p[n]-pK)/s.dz;
+    if(!faceSolidW(i,j,k+1)) s.w[idxW(i,j,k+1)] -= dt*(pF-s.p[n])/s.dz;
+  }
+  // hard no-flux at solid faces
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    if(!s.solid[idx(i,j,k)]) continue;
+    s.u[idxU(i,j,k)]=0;
+    if(i<s.nx) s.u[idxU(i+1,j,k)]=0;
+    s.v[idxV(i,j,k)]=0;
+    if(j<s.ny) s.v[idxV(i,j+1,k)]=0;
+    s.w[idxW(i,j,k)]=0;
+    if(k<s.nz) s.w[idxW(i,j,k+1)]=0;
+  }
+  computeCenterVel();
+}
+
+/* thermal transport: semi-Lagrangian advection + diffusion + sources */
+function thermalStep(dt){
+  const s=solver;
+  const st=makeSampler(s.T,s.nx,s.ny,s.nz,0,0,0);
+  const su=makeSampler(s.u,s.nx+1,s.ny,s.nz,-0.5,0,0);
+  const sv=makeSampler(s.v,s.nx,s.ny+1,s.nz,0,-0.5,0);
+  const sw=makeSampler(s.w,s.nx,s.ny,s.nz+1,0,0,-0.5);
+  const cf=dt/(s.dx*s.dx);
+  for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+    const n=idx(i,j,k);
+    if(s.solid[n]){ s.T2[n]=env.Tamb; continue; }
+    const c=cellCenter(i,j,k);
+    const uu=s.uc[n], vv=s.vc[n], ww=s.wc[n];
+    let Tn=st(c.x-uu*dt,c.y-vv*dt,c.z-ww*dt);
+    const nb=(ii,jj,kk)=>{
+      const ci=clamp(ii,0,s.nx-1), cj=clamp(jj,0,s.ny-1), ck=clamp(kk,0,s.nz-1);
+      return s.solid[idx(ci,cj,ck)] ? Tn : s.T[idx(ci,cj,ck)];
+    };
+    const lap=(nb(i+1,j,k)+nb(i-1,j,k)+nb(i,j+1,k)+nb(i,j-1,k)+nb(i,j,k+1)+nb(i,j,k-1)-6*Tn);
+    Tn += (ALPHA_T + s.nuT[n]/PR_T)*cf*lap;
+    Tn += s.srcT[n]*dt/(RHO0*CP_AIR);
+    // relax to ambient at open domain edges
+    if(i===0||i===s.nx-1||k===0||k===s.nz-1||j===s.ny-1) Tn=lerp(Tn,env.Tamb,0.30);
+    s.T2[n]=clamp(Tn,-30,60);
+  }
+  s.T.set(s.T2);
+  // 37 °C skin isotherm on occupant cells
+  const R=0.17;
+  for(const m of world.dummies){
+    for(let k=0;k<s.nz;k++) for(let j=0;j<s.ny;j++) for(let i=0;i<s.nx;i++){
+      const c=cellCenter(i,j,k);
+      if(c.y>DUMMY_H) continue;
+      const dx=c.x-m.x, dz=c.z-m.z;
+      if(dx*dx+dz*dz<=R*R) s.T[idx(i,j,k)]=DUMMY_T;
+    }
+  }
+}
+
+/* ============================================================
+   §8  QUERY API for visualization
+   ============================================================ */
+function sliceGrid(mode, frac){
+  const S=solver;
+  if(!S.built) return null;
+  if(mode==="top"){
+    const j=clamp(Math.round(frac*(S.ny-1)),0,S.ny-1);
+    return { w:S.nx, h:S.nz,
+      cell:(a,b)=>{ const i=a,k=b,n=idx(i,j,k);
+        return {T:S.T[n], solid:S.solid[n], u:S.uc[n], v:S.wc[n], p:S.p[n],
+                x:S.x0+(i+0.5)*S.dx, z:S.z0+(k+0.5)*S.dz}; } };
+  }
+  if(mode==="front"){
+    const k=clamp(Math.round(frac*(S.nz-1)),0,S.nz-1);
+    return { w:S.nx, h:S.ny,
+      cell:(a,b)=>{ const i=a,j=b,n=idx(i,j,k);
+        return {T:S.T[n], solid:S.solid[n], u:S.uc[n], v:S.vc[n], p:S.p[n],
+                x:S.x0+(i+0.5)*S.dx, y:S.y0+(j+0.5)*S.dy}; } };
+  }
+  const i=clamp(Math.round(frac*(S.nx-1)),0,S.nx-1);
+  return { w:S.nz, h:S.ny,
+    cell:(a,b)=>{ const k=a,j=b,n=idx(i,j,k);
+      return {T:S.T[n], solid:S.solid[n], u:S.wc[n], v:S.vc[n], p:S.p[n],
+              x:S.z0+(k+0.5)*S.dz, y:S.y0+(j+0.5)*S.dy}; } };
+}
+function probePoint(x,y,z){
+  const S=solver;
+  if(!S.built) return null;
+  const i=clamp(Math.floor((x-S.x0)/S.dx),0,S.nx-1);
+  const j=clamp(Math.floor((y-S.y0)/S.dy),0,S.ny-1);
+  const k=clamp(Math.floor((z-S.z0)/S.dz),0,S.nz-1);
+  const n=idx(i,j,k);
+  const spd=Math.hypot(S.uc[n],S.vc[n],S.wc[n]);
+  return { i,j,k,n, T:S.T[n], p:S.p[n], solid:!!S.solid[n],
+           u:S.uc[n], v:S.vc[n], w:S.wc[n], speed:spd };
+}
+
+/* ============================================================
+   §8b  ParaView legacy VTK export
+   ============================================================ */
+function exportVTK(){
+  const S=solver;
+  if(!S.built){ toast("Solver not built", true); return; }
+  const {nx,ny,nz,dx,dy,dz,x0,y0,z0}=S;
+  const L=[];
+  L.push("# vtk DataFile Version 3.0");
+  L.push("AeroThermal3D indoor CFD fields (Navier-Stokes + Boussinesq + LES)");
+  L.push("ASCII");
+  L.push("DATASET STRUCTURED_POINTS");
+  L.push(`DIMENSIONS ${nx} ${ny} ${nz}`);
+  L.push(`ORIGIN ${x0.toFixed(3)} ${y0.toFixed(3)} ${z0.toFixed(3)}`);
+  L.push(`SPACING ${dx.toFixed(4)} ${dy.toFixed(4)} ${dz.toFixed(4)}`);
+  const N=nx*ny*nz;
+  L.push(`POINT_DATA ${N}`);
+  L.push("SCALARS temperature float 1");
+  L.push("LOOKUP_TABLE default");
+  const Ts=[]; for(let n=0;n<N;n++) Ts.push(S.T[n].toFixed(3));
+  L.push(Ts.join(" "));
+  L.push("SCALARS pressure float 1");
+  L.push("LOOKUP_TABLE default");
+  const Ps=[]; for(let n=0;n<N;n++) Ps.push(S.p[n].toFixed(4));
+  L.push(Ps.join(" "));
+  L.push("SCALARS solid_mask unsigned_char 1");
+  L.push("LOOKUP_TABLE default");
+  const Ss=[]; for(let n=0;n<N;n++) Ss.push(S.solid[n]);
+  L.push(Ss.join(" "));
+  L.push("VECTORS velocity float");
+  const Vs=[]; for(let n=0;n<N;n++) Vs.push(`${S.uc[n].toFixed(3)} ${S.vc[n].toFixed(3)} ${S.wc[n].toFixed(3)}`);
+  L.push(Vs.join(" "));
+  L.push("SCALARS eddy_viscosity float 1");
+  L.push("LOOKUP_TABLE default");
+  const Ns=[]; for(let n=0;n<N;n++) Ns.push(S.nuT[n].toFixed(6));
+  L.push(Ns.join(" "));
+  downloadFile(`aerothermal3d_t${S.t.toFixed(1)}s.vtk`, L.join("\n"), "text/plain");
+  toast(`VTK exported: ${nx}×${ny}×${nz} = ${N} cells`);
+}
+
+
+/* ============================================================
+   §9  2D CANVAS — CAD floor plan editor + planar CFD view
+   ============================================================ */
+const cv = $id("c2d");
+const ctx = cv.getContext("2d");
+const view2d = {
+  scale:60, ox:0, oz:0,
+  tool:"select",
+  drag:null,
+  pendingWall:null,
+  mouse:{x:0,y:0,wx:0,wz:0,down:false},
+  needsDraw:true,
+};
+const selection = { id:null, get(){ return objectById(this.id); }, clear(){ this.id=null; refreshInspector(); } };
+
+function w2sX(x){ return view2d.ox + x*view2d.scale; }
+function w2sZ(z){ return view2d.oz + z*view2d.scale; }
+function s2wX(px){ return (px-view2d.ox)/view2d.scale; }
+function s2wZ(pz){ return (pz-view2d.oz)/view2d.scale; }
+
+/* screen mapping for the active slice mode (sim view) */
+function sliceMap(){
+  const r=cv.parentElement.getBoundingClientRect();
+  const W=r.width, H=r.height, S=solver;
+  if(view.sliceMode==="top" || !S.built){
+    return { kind:"top",
+      px:(x)=>w2sX(x), py:(z)=>w2sZ(z),
+      wx:(p)=>s2wX(p), wz:(p)=>s2wZ(p) };
+  }
+  const horizIsX = view.sliceMode==="front";
+  const u0 = horizIsX? S.x0 : S.z0;
+  const uSpan = horizIsX? S.nx*S.dx : S.nz*S.dz;
+  const mLeft=76, mRight=34, mTop=84, mBot=64;
+  const su=(W-mLeft-mRight)/Math.max(uSpan,0.1);
+  const sv=(H-mTop-mBot)/ROOM_H;
+  return { kind:view.sliceMode, u0, su, sv, baseY:H-mBot, mLeft,
+    px:(u)=> mLeft+(u-u0)*su,
+    py:(y)=> (H-mBot)-y*sv,
+    wu:(p)=> u0+(p-mLeft)/su,
+    wy:(p)=> (H-mBot-p)/sv };
+}
+/* plan view active? (design mode always plan) */
+const isPlanView = ()=> view.mode==="design" || view.sliceMode==="top";
+
+function resizeCanvas2d(){
+  const r=cv.parentElement.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  cv.width=Math.max(2,Math.round(r.width*dpr));
+  cv.height=Math.max(2,Math.round(r.height*dpr));
+  cv.style.width=r.width+"px"; cv.style.height=r.height+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  view2d.needsDraw=true;
+}
+function fitView2d(){
+  const b=worldBounds();
+  const r=cv.parentElement.getBoundingClientRect();
+  if(r.width<20||r.height<20) return;   // hidden canvas — defer to pane switch
+  const pad=46;
+  const sx=(r.width-2*pad)/Math.max(b.x1-b.x0,0.5);
+  const sz=(r.height-2*pad)/Math.max(b.z1-b.z0,0.5);
+  view2d.scale=clamp(Math.min(sx,sz),8,140);
+  view2d.ox=r.width/2-(b.x0+b.x1)/2*view2d.scale;
+  view2d.oz=r.height/2-(b.z0+b.z1)/2*view2d.scale;
+  view2d.needsDraw=true;
+}
+
+/* ---------- hit testing (plan view) ---------- */
+function hitDummy(wx,wz){
+  for(let i=world.dummies.length-1;i>=0;i--){
+    const m=world.dummies[i];
+    if(Math.hypot(wx-m.x,wz-m.z)<0.45) return m;
+  }
+  return null;
+}
+function hitOpening(arr,wx,wz){
+  for(let i=arr.length-1;i>=0;i--){
+    const o=arr[i];
+    const host=hostOf(o); if(!host) continue;
+    const span=openingSpan(host,o.s,o.w);
+    if(span.horiz){
+      if(Math.abs(wz-span.z)<0.30 && wx>=Math.min(span.x1,span.x2)-0.15 && wx<=Math.max(span.x1,span.x2)+0.15) return o;
+    }else{
+      if(Math.abs(wx-span.x)<0.30 && wz>=Math.min(span.z1,span.z2)-0.15 && wz<=Math.max(span.z1,span.z2)+0.15) return o;
+    }
+  }
+  return null;
+}
+function hitWall(wx,wz,skipHosted=true){
+  for(let i=world.walls.length-1;i>=0;i--){
+    const w=world.walls[i];
+    if(skipHosted && hasOpeningAt(w,wx,wz)) continue;   // wall hidden under its own openings
+    const lo=Math.min(w.a,w.b), hi=Math.max(w.a,w.b);
+    if(w.horiz){ if(Math.abs(wz-w.fixed)<=w.th/2+0.14 && wx>=lo-0.2&&wx<=hi+0.2) return w; }
+    else       { if(Math.abs(wx-w.fixed)<=w.th/2+0.14 && wz>=lo-0.2&&wz<=hi+0.2) return w; }
+  }
+  return null;
+}
+function hasOpeningAt(w,wx,wz){
+  const chk=(arr)=>arr.some(o=>{
+    if(o.host!==w.id) return false;
+    const span=openingSpan(w,o.s,o.w);
+    if(span.horiz) return Math.abs(wz-span.z)<0.32 && wx>=Math.min(span.x1,span.x2)-0.15 && wx<=Math.max(span.x1,span.x2)+0.15;
+    return Math.abs(wx-span.x)<0.32 && wz>=Math.min(span.z1,span.z2)-0.15 && wz<=Math.max(span.z1,span.z2)+0.15;
+  });
+  return chk(world.windows)||chk(world.doors);
+}
+function hitTest(wx,wz){
+  return hitDummy(wx,wz) || hitOpening(world.windows,wx,wz) || hitOpening(world.doors,wx,wz) || hitWall(wx,wz);
+}
+
+/* ---------- snapping ---------- */
+const SNAP=0.25;
+const snap = v=> Math.round(v/SNAP)*SNAP;
+const round1 = v=> Math.round(v*10)/10;
+function collectWallCoords(excludeId){
+  const xs=new Set(), zs=new Set();
+  for(const w of world.walls){
+    if(w.id===excludeId) continue;
+    const p=wallEndpoints(w);
+    xs.add(round1(p.x1)); xs.add(round1(p.x2)); zs.add(round1(p.z1)); zs.add(round1(p.z2));
+  }
+  return {xs:[...xs], zs:[...zs]};
+}
+function snapNear(v,targets,tol=0.35){
+  let best=v, bd=tol;
+  for(const t of targets){ const d=Math.abs(v-t); if(d<bd){bd=d;best=t;} }
+  return best;
+}
+
+/* ============================================================
+   §10  2D DRAW
+   ============================================================ */
+function draw2d(){
+  const r=cv.parentElement.getBoundingClientRect();
+  const W=r.width, H=r.height;
+  ctx.save();
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#0a0f16"); g.addColorStop(1,"#0d131c");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  const sim = view.mode==="sim";
+  const plan = isPlanView();
+  if(sim && solver.built && !plan){
+    drawField2d(W,H);
+    drawSection2d();
+    if(view.glyphs) drawGlyphs2d();
+    if(view.streamlines) drawStreamlines2d();
+  }else if(sim && solver.built){
+    drawField2d(W,H);
+    drawWalls2d();
+    if(view.glyphs) drawGlyphs2d();
+    if(view.streamlines) drawStreamlines2d();
+    drawDummies2d();
+  }else{
+    drawGrid2d(W,H);
+    drawWalls2d();
+    drawDummies2d();
+    if(view2d.pendingWall) drawPendingWall2d();
+    drawSelection2d();
+  }
+  drawScaleBar2d(W,H,plan);
+  ctx.restore();
+  view2d.needsDraw=false;
+}
+
+function drawGrid2d(W,H){
+  ctx.lineWidth=1;
+  ctx.strokeStyle="rgba(56,110,160,0.10)";
+  ctx.beginPath();
+  const x0=Math.floor(s2wX(0)/0.5)*0.5, x1=s2wX(W);
+  for(let x=x0;x<=x1;x+=0.5){ const px=Math.round(w2sX(x))+0.5; ctx.moveTo(px,0); ctx.lineTo(px,H); }
+  const z0=Math.floor(s2wZ(0)/0.5)*0.5, z1=s2wZ(H);
+  for(let z=z0;z<=z1;z+=0.5){ const pz=Math.round(w2sZ(z))+0.5; ctx.moveTo(0,pz); ctx.lineTo(W,pz); }
+  ctx.stroke();
+  ctx.strokeStyle="rgba(70,130,190,0.22)";
+  ctx.beginPath();
+  for(let x=Math.floor(x0);x<=x1;x++){ const px=Math.round(w2sX(x))+0.5; ctx.moveTo(px,0); ctx.lineTo(px,H); }
+  for(let z=Math.floor(z0);z<=z1;z++){ const pz=Math.round(w2sZ(z))+0.5; ctx.moveTo(0,pz); ctx.lineTo(W,pz); }
+  ctx.stroke();
+  ctx.strokeStyle="rgba(90,160,220,0.5)";
+  ctx.beginPath();
+  ctx.moveTo(w2sX(0),0); ctx.lineTo(w2sX(0),H);
+  ctx.moveTo(0,w2sZ(0)); ctx.lineTo(W,w2sZ(0));
+  ctx.stroke();
+  ctx.fillStyle="rgba(140,180,220,0.65)"; ctx.font="11px monospace";
+  if(view2d.scale>18){
+    for(let x=Math.floor(x0);x<=x1;x++) if(x%2===0) ctx.fillText(x+"m", w2sX(x)+3, w2sZ(0)-4);
+    for(let z=Math.floor(z0);z<=z1;z++) if(z%2===0) ctx.fillText(z+"m", w2sX(0)+4, w2sZ(z)-3);
+  }
+  // wind compass
+  const cx=W-34, cy=36;
+  ctx.strokeStyle="rgba(120,170,230,0.5)"; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(cx,cy,15,0,Math.PI*2); ctx.stroke();
+  const a=rad(env.az);
+  ctx.strokeStyle="#f97316"; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+13*Math.cos(a), cy+13*Math.sin(a)); ctx.stroke();
+  ctx.fillStyle="rgba(160,200,240,0.8)"; ctx.font="9px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("wind",cx,cy+29); ctx.textAlign="left";
+}
+
+/* ---- scalar field heatmap ---- */
+let fieldImg=null, fieldLut=null, fieldKey="";
+function drawField2d(W,H){
+  const sg=sliceGrid(view.sliceMode, view.slicePos);
+  if(!sg) return;
+  const S=solver, nx=sg.w, nz=sg.h;
+  const key=`${view.cmap}|${view.quantity}|${nx}x${nz}`;
+  if(fieldKey!==key){
+    fieldImg=new ImageData(nx,nz);
+    fieldLut=[];
+    for(let i=0;i<256;i++) fieldLut.push(cmapRGB(view.cmap,i/255));
+    fieldKey=key;
+  }
+  const vals=new Float32Array(nx*nz);
+  let vmin=1e9, vmax=-1e9;
+  for(let b=0;b<nz;b++) for(let a=0;a<nx;a++){
+    const c=sg.cell(a,b);
+    let v;
+    if(c.solid) v=NaN;
+    else if(view.quantity==="T") v=c.T;
+    else if(view.quantity==="speed") v=Math.hypot(c.u,c.v);
+    else if(view.quantity==="p") v=c.p;
+    else v=0;
+    vals[a+nx*b]=v;
+    if(!isNaN(v)){ if(v<vmin)vmin=v; if(v>vmax)vmax=v; }
+  }
+  if(view.quantity==="vort"){
+    const h=2*Math.min(S.dx,S.dy);
+    for(let b=1;b<nz-1;b++) for(let a=1;a<nx-1;a++){
+      const c=sg.cell(a,b);
+      if(c.solid){ vals[a+nx*b]=NaN; continue; }
+      vals[a+nx*b]=((sg.cell(a+1,b).v-sg.cell(a-1,b).v)-(sg.cell(a,b+1).u-sg.cell(a,b-1).u))/h;
+    }
+    vmin=1e9;vmax=-1e9;
+    for(let n=0;n<nx*nz;n++){ const v=vals[n]; if(!isNaN(v)){ if(v<vmin)vmin=v; if(v>vmax)vmax=v; } }
+    const m=Math.max(Math.abs(vmin),Math.abs(vmax),1e-3);
+    vmin=-m; vmax=m;
+  }
+  if(view.quantity==="T"){ vmin=Math.min(env.Tamb-2,vmin); vmax=Math.max(env.Tamb+3,vmax,DUMMY_T); }
+  if(vmax-vmin<1e-6) vmax=vmin+1e-6;
+  drawField2d.range=[vmin,vmax];
+  const img=fieldImg.data, lut=fieldLut;
+  for(let n=0;n<nx*nz;n++){
+    const v=vals[n], o=n*4;
+    if(isNaN(v)){ img[o]=13;img[o+1]=19;img[o+2]=27;img[o+3]=255; continue; }
+    const c=lut[clamp(Math.round((v-vmin)/(vmax-vmin)*255),0,255)];
+    img[o]=c[0];img[o+1]=c[1];img[o+2]=c[2];img[o+3]=235;
+  }
+  if(!drawField2d.off || drawField2d.off.width!==nx || drawField2d.off.height!==nz){
+    drawField2d.off=document.createElement("canvas");
+    drawField2d.off.width=nx; drawField2d.off.height=nz;
+  }
+  drawField2d.off.getContext("2d").putImageData(fieldImg,0,0);
+  const m=sliceMap();
+  if(m.kind==="top"){
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(drawField2d.off, 0,0,nx,nz,
+      w2sX(S.x0), w2sZ(S.z0), nx*S.dx*view2d.scale, nz*S.dz*view2d.scale);
+  }else{
+    ctx.save();
+    ctx.translate(0, m.baseY);
+    ctx.scale(1,-1);
+    ctx.imageSmoothingEnabled=true;
+    const wpx=(m.su*S.dx)*nx, hpx=(m.sv*S.dy)*S.ny;
+    ctx.drawImage(drawField2d.off, 0,0,nx,nz, m.mLeft, 0, wpx, hpx);
+    ctx.restore();
+  }
+  updateLegend(vmin,vmax);
+}
+
+/* ---- CAD overlay in section (front/side) views ---- */
+function drawSection2d(){
+  const m=sliceMap();
+  if(m.kind==="top") return;
+  const S=solver;
+  const zc = m.kind==="front" ? S.z0+view.slicePos*S.nz*S.dz : null;
+  const xc = m.kind==="side"  ? S.x0+view.slicePos*S.nx*S.dx : null;
+  // walls crossing the cut plane
+  for(const w of world.walls){
+    const lo=Math.min(w.a,w.b), hi=Math.max(w.a,w.b);
+    let u=null;
+    if(m.kind==="front" && !w.horiz && zc>=lo-0.01 && zc<=hi+0.01) u=w.fixed;       // Z-wall crossing z plane? wall along Z at x=fixed
+    if(m.kind==="front" && w.horiz && Math.abs(zc-w.fixed)<w.th/2+0.15) u=null;      // X-wall parallel in-plane: draw band
+    if(m.kind==="side" && w.horiz && xc>=lo-0.01 && xc<=hi+0.01) u=w.fixed;
+    if(u!==null){
+      const sel=selection.id===w.id;
+      ctx.fillStyle=sel?"#f59e0b":"rgba(150,170,195,0.95)";
+      const t=Math.max(w.th*m.su,3);
+      ctx.fillRect(m.px(u)-t/2, m.py(ROOM_H), t, m.py(0)-m.py(ROOM_H));
+    }
+    if(m.kind==="front" && w.horiz && Math.abs(zc-w.fixed)<w.th/2+0.15){
+      ctx.fillStyle="rgba(150,170,195,0.55)";
+      ctx.fillRect(m.px(lo), m.py(ROOM_H), (hi-lo)*m.su, m.py(ROOM_H-0.18)-m.py(ROOM_H));
+    }
+    if(m.kind==="side" && !w.horiz && Math.abs(xc-w.fixed)<w.th/2+0.15){
+      ctx.fillStyle="rgba(150,170,195,0.55)";
+      ctx.fillRect(m.px(lo), m.py(ROOM_H), (hi-lo)*m.su, m.py(ROOM_H-0.18)-m.py(ROOM_H));
+    }
+  }
+  // openings intersecting the plane
+  const drawOpenSection=(o,isDoor)=>{
+    const host=hostOf(o); if(!host) return;
+    const span=openingSpan(host,o.s,o.w);
+    const u = span.horiz? (m.kind==="front"? null : clamp(xc, Math.min(span.x1,span.x2), Math.max(span.x1,span.x2)))
+                        : (m.kind==="side"? null : clamp(zc, Math.min(span.z1,span.z2), Math.max(span.z1,span.z2)));
+    if(u===null) return;   // opening runs in-plane; skip (band shown via wall)
+    const y0=isDoor?0:o.y0, y1=isDoor?o.h:o.y0+o.h;
+    const sel=selection.id===o.id;
+    ctx.fillStyle = isDoor? "rgba(252,165,165,0.9)" : (sel?"rgba(245,158,11,0.9)":"rgba(125,211,252,0.85)");
+    const t=Math.max(host.th*m.su,4);
+    ctx.fillRect(m.px(u)-t/2, m.py(y1), t, m.py(y0)-m.py(y1));
+    if(!isDoor && o.open>0.03){
+      // casement sash projected in section
+      const th=o.open*Math.PI/2;
+      ctx.strokeStyle=sel?"#ffd166":"rgba(147,220,255,0.95)";
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(m.px(u), m.py(y1));
+      ctx.lineTo(m.px(u)+Math.sin(th)*((y1-y0)*m.sv)*0.5, m.py(y1));
+      ctx.stroke();
+    }
+  };
+  for(const o of world.doors) drawOpenSection(o,true);
+  for(const o of world.windows) drawOpenSection(o,false);
+  // dummies near the plane
+  for(const dm of world.dummies){
+    const d = m.kind==="front"? Math.abs(dm.z-zc) : Math.abs(dm.x-xc);
+    if(d>0.35) continue;
+    const sel=selection.id===dm.id;
+    const px=m.px(m.kind==="front"?dm.x:dm.z);
+    ctx.fillStyle=sel?"#fbbf24":"#c7d6ea";
+    ctx.strokeStyle=sel?"#f59e0b":"#5d7290";
+    ctx.lineWidth=1.5;
+    const hw=Math.max(0.16*m.su,3);
+    ctx.beginPath();
+    ctx.moveTo(px-hw,m.py(0));
+    ctx.lineTo(px-hw*0.75,m.py(DUMMY_H*0.92));
+    ctx.quadraticCurveTo(px,m.py(DUMMY_H),px+hw*0.75,m.py(DUMMY_H*0.92));
+    ctx.lineTo(px+hw,m.py(0));
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  // section frame + labels
+  ctx.strokeStyle="rgba(120,170,230,0.5)"; ctx.lineWidth=1;
+  ctx.strokeRect(m.mLeft, m.py(ROOM_H), (solver.nx*(m.kind==="front"?solver.dx:solver.dz))*m.su, m.py(0)-m.py(ROOM_H));
+  ctx.fillStyle="rgba(150,190,230,0.8)"; ctx.font="11px sans-serif";
+  ctx.fillText(m.kind==="front"?"SECTION A–A (X–Y) @ z":"SECTION B–B (Z–Y) @ x", m.mLeft, m.py(ROOM_H)-10);
+  ctx.fillText("0 m", m.mLeft-34, m.py(0)+4);
+  ctx.fillText(ROOM_H.toFixed(1)+" m (ceiling)", m.mLeft-70, m.py(ROOM_H)+4);
+}
+
+/* ---- velocity glyphs ---- */
+function drawGlyphs2d(){
+  const sg=sliceGrid(view.sliceMode, view.slicePos);
+  if(!sg) return;
+  const S=solver, m=sliceMap();
+  const step=[0,7,5,4,3][view.glyphDens];
+  let vmax=0.05;
+  for(let b=0;b<sg.h;b++) for(let a=0;a<sg.w;a++){
+    const c=sg.cell(a,b);
+    if(!c.solid) vmax=Math.max(vmax,Math.hypot(c.u,c.v));
+  }
+  ctx.save();
+  for(let b=0;b<sg.h;b+=step) for(let a=0;a<sg.w;a+=step){
+    const c=sg.cell(a,b);
+    if(c.solid) continue;
+    const sp=Math.hypot(c.u,c.v);
+    if(sp<0.015) continue;
+    let px,pz,ang;
+    if(m.kind==="top"){ px=w2sX(c.x); pz=w2sZ(c.z); ang=Math.atan2(c.v,c.u); }
+    else{
+      const u = m.kind==="front"? c.x : c.x;   // cell.x holds horizontal world coord
+      px=m.px(u); pz=m.py(c.y); ang=Math.atan2(-c.v,c.u);
+    }
+    const len=clamp(sp/vmax,0.08,1)*step*S.dx*(m.kind==="top"?view2d.scale:m.su)*0.95;
+    const [cr,cg,cb]=cmapRGB(view.cmap,clamp(sp/vmax,0,1));
+    ctx.strokeStyle=`rgba(${cr},${cg},${cb},0.92)`;
+    ctx.fillStyle=ctx.strokeStyle;
+    ctx.lineWidth=1.4;
+    ctx.beginPath();
+    ctx.moveTo(px-Math.cos(ang)*len*0.5, pz-Math.sin(ang)*len*0.5);
+    ctx.lineTo(px+Math.cos(ang)*len*0.5, pz+Math.sin(ang)*len*0.5);
+    ctx.stroke();
+    const hx=px+Math.cos(ang)*len*0.5, hy=pz+Math.sin(ang)*len*0.5;
+    ctx.beginPath();
+    ctx.moveTo(hx,hy);
+    ctx.lineTo(hx-Math.cos(ang-0.42)*4.5, hy-Math.sin(ang-0.42)*4.5);
+    ctx.lineTo(hx-Math.cos(ang+0.42)*4.5, hy-Math.sin(ang+0.42)*4.5);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---- animated streamlines ---- */
+function drawStreamlines2d(){
+  const sg=sliceGrid(view.sliceMode, view.slicePos);
+  if(!sg) return;
+  const m=sliceMap();
+  const now=performance.now()/1000;
+  const posOf=(c)=>{
+    if(m.kind==="top") return [w2sX(c.x), w2sZ(c.z)];
+    return [m.px(c.x), m.py(c.y)];
+  };
+  const vel=(a,b)=>{
+    const c=sg.cell(clamp(Math.round(a),0,sg.w-1), clamp(Math.round(b),0,sg.h-1));
+    return [c.u,c.v];
+  };
+  const step=[0,6,5,4,3][view.glyphDens];
+  const seeds=[];
+  for(let b=1;b<sg.h-1;b+=step) for(let a=1;a<sg.w-1;a+=step){
+    const c=sg.cell(a,b);
+    if(!c.solid && Math.hypot(c.u,c.v)>0.08) seeds.push([a,b]);
+  }
+  ctx.save();
+  ctx.lineWidth=1.6;
+  let drawn=0;
+  for(const [a0,b0] of seeds){
+    if(drawn>340) break;
+    let a=a0,b=b0;
+    const pts=[];
+    for(let n=0;n<26;n++){
+      const [du,dv]=vel(a,b);
+      const sp=Math.hypot(du,dv); if(sp<0.02) break;
+      a+=du/sp*0.7; b+=dv/sp*0.7;
+      if(a<0||a>=sg.w||b<0||b>=sg.h) break;
+      const c=sg.cell(Math.round(a),Math.round(b));
+      if(c.solid) break;
+      pts.push(posOf(c));
+    }
+    if(pts.length<3) continue;
+    drawn++;
+    ctx.strokeStyle=`rgba(235,248,255,${(0.14+0.28*((drawn*0.37+now*0.25)%1)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    for(const p of pts) ctx.lineTo(p[0],p[1]);
+    ctx.stroke();
+    const hp=pts[Math.min(pts.length-1, Math.floor(((now*0.5)+a0*0.13+b0*0.07)%1*pts.length))];
+    if(hp){ ctx.fillStyle="rgba(255,255,255,0.85)"; ctx.beginPath(); ctx.arc(hp[0],hp[1],1.8,0,7); ctx.fill(); }
+  }
+  ctx.restore();
+}
+
+/* ---- CAD primitives (plan view) ---- */
+function drawWalls2d(){
+  const s=view2d.scale;
+  const sim=view.mode==="sim";
+  for(const w of world.walls){
+    const p=wallEndpoints(w);
+    const x1=w2sX(p.x1), z1=w2sZ(p.z1), x2=w2sX(p.x2), z2=w2sZ(p.z2);
+    const horiz=Math.abs(z1-z2)<Math.abs(x1-x2);
+    const t=Math.max(w.th*s,3);
+    const sel=selection.id===w.id;
+    ctx.fillStyle="rgba(0,0,0,0.45)";
+    if(horiz) ctx.fillRect(Math.min(x1,x2)-1, z1-t/2+2, Math.abs(x2-x1), t);
+    else ctx.fillRect(x1-t/2+2, Math.min(z1,z2)-1, t, Math.abs(z2-z1));
+    ctx.fillStyle= sel? "#f59e0b" : (sim?"rgba(158,178,200,0.92)":"#8299b4");
+    if(horiz) ctx.fillRect(Math.min(x1,x2), z1-t/2, Math.abs(x2-x1), t);
+    else ctx.fillRect(x1-t/2, Math.min(z1,z2), t, Math.abs(z2-z1));
+    if(sel){
+      ctx.strokeStyle="#fbbf24"; ctx.lineWidth=1.5;
+      const pad=6;
+      ctx.strokeRect(Math.min(x1,x2)-t/2-pad, Math.min(z1,z2)-t/2-pad,
+                     Math.abs(x2-x1)+t+2*pad, Math.abs(z2-z1)+t+2*pad);
+    }
+  }
+  for(const o of world.doors) drawDoor2d(o);
+  for(const o of world.windows) drawWindow2d(o);
+}
+function drawWindow2d(o){
+  const host=hostOf(o); if(!host) return;
+  const span=openingSpan(host,o.s,o.w);
+  const s=view2d.scale;
+  const sel=selection.id===o.id;
+  const L=span.horiz?Math.abs(span.x2-span.x1):Math.abs(span.z2-span.z1);
+  ctx.save();
+  ctx.translate(span.horiz?w2sX(Math.min(span.x1,span.x2)):w2sX(span.x),
+                span.horiz?w2sZ(span.z):w2sZ(Math.min(span.z1,span.z2)));
+  if(!span.horiz) ctx.rotate(Math.PI/2);
+  const t=Math.max(host.th*s,4);
+  ctx.fillStyle= sel? "rgba(245,158,11,0.35)":"rgba(125,211,252,0.30)";
+  ctx.fillRect(0,-t*0.72,L,t*1.44);
+  ctx.strokeStyle= sel? "#fbbf24":"#7dd3fc"; ctx.lineWidth=1.6;
+  ctx.strokeRect(0,-t*0.72,L,t*1.44);
+  // casement sashes rotated by θ = open × 90° (plan projection)
+  const th=o.open*Math.PI/2;
+  ctx.lineWidth=2.2;
+  for(const dir of [-1,1]){
+    const pivot=dir<0?0:L;
+    const sx=dir<0? L*0.5 : -L*0.5;   // sash extends inward from outer edge
+    ctx.strokeStyle= sel? "#ffd166" :"rgba(147,220,255,0.95)";
+    ctx.beginPath();
+    ctx.moveTo(pivot,0);
+    ctx.lineTo(pivot+Math.cos(th)*sx, Math.sin(th)*sx*dir*0+Math.sin(th)*Math.abs(sx)*(dir<0?-1:1));
+    ctx.stroke();
+  }
+  // center hinge marker
+  ctx.fillStyle=sel?"#fbbf24":"#7dd3fc";
+  ctx.beginPath(); ctx.arc(L/2,0,2.4,0,7); ctx.fill();
+  if(s>26||sel){
+    ctx.fillStyle= sel? "#fbbf24":"rgba(180,225,250,0.9)";
+    ctx.font="10px sans-serif";
+    ctx.fillText(`${Math.round(o.open*90)}°`, L/2-8, -t*0.9-3);
+  }
+  ctx.restore();
+}
+function drawDoor2d(o){
+  const host=hostOf(o); if(!host) return;
+  const span=openingSpan(host,o.s,o.w);
+  const s=view2d.scale;
+  const sel=selection.id===o.id;
+  const L=span.horiz?Math.abs(span.x2-span.x1):Math.abs(span.z2-span.z1);
+  ctx.save();
+  ctx.translate(span.horiz?w2sX(Math.min(span.x1,span.x2)):w2sX(span.x),
+                span.horiz?w2sZ(span.z):w2sZ(Math.min(span.z1,span.z2)));
+  if(!span.horiz) ctx.rotate(Math.PI/2);
+  const t=Math.max(host.th*s,4);
+  ctx.fillStyle="#0e141d";
+  ctx.fillRect(0,-t*0.8,L,t*1.6);
+  const th=o.open*Math.PI/2;
+  const inward=o.swing.startsWith("in");
+  const y0=inward?-1:1;
+  ctx.strokeStyle= sel? "#fbbf24":"rgba(252,165,165,0.75)";
+  ctx.lineWidth=1.3;
+  ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  if(y0>0) ctx.arc(0,0,L,0,th,false);
+  else ctx.arc(0,0,L,0,-th,true);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const lx=Math.cos(th)*L, ly=Math.sin(th)*L*y0;
+  ctx.strokeStyle= sel? "#ffd166" : "#fca5a5";
+  ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(lx,ly); ctx.stroke();
+  if(sel||s>30){
+    ctx.fillStyle= sel?"#fbbf24":"rgba(252,200,200,0.9)";
+    ctx.font="10px sans-serif";
+    ctx.fillText(`${Math.round(o.open*90)}°`, L*0.55, y0*(L*0.35+12));
+  }
+  ctx.restore();
+}
+function drawDummies2d(){
+  const s=view2d.scale;
+  for(const m of world.dummies){
+    const px=w2sX(m.x), pz=w2sZ(m.z);
+    const sel=selection.id===m.id;
+    if(view.mode==="sim"&&solver.built){
+      const rg=ctx.createRadialGradient(px,pz,2,px,pz,Math.max(0.55*s,10));
+      rg.addColorStop(0,"rgba(251,146,60,0.30)");
+      rg.addColorStop(1,"rgba(251,146,60,0)");
+      ctx.fillStyle=rg;
+      ctx.beginPath(); ctx.arc(px,pz,Math.max(0.55*s,10),0,7); ctx.fill();
+    }
+    ctx.fillStyle= sel? "#fbbf24" : "#c7d6ea";
+    ctx.strokeStyle= sel? "#f59e0b" : "#5d7290";
+    ctx.lineWidth=1.5;
+    const r=Math.max(0.18*s,4);
+    ctx.beginPath();
+    ctx.arc(px,pz,r,Math.PI,0);
+    ctx.lineTo(px+r,pz+r*2.6);
+    ctx.lineTo(px-r,pz+r*2.6);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    if(s>24){
+      ctx.fillStyle="rgba(253,186,116,0.95)";
+      ctx.font="9.5px sans-serif"; ctx.textAlign="center";
+      ctx.fillText("1.83m · 37°C", px, pz+r*2.6+11);
+      ctx.textAlign="left";
+    }
+    if(sel){
+      ctx.strokeStyle="#f59e0b"; ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.arc(px,pz,0.45*s,0,7); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}
+function drawPendingWall2d(){
+  const pw=view2d.pendingWall;
+  if(!pw) return;
+  const s=view2d.scale;
+  const {wx,wz}=view2d.mouse;
+  let lo,hi,fixed;
+  if(pw.horiz){ fixed=pw.fixed; lo=Math.min(pw.a,wx); hi=Math.max(pw.a,wx); }
+  else{ fixed=pw.fixed; lo=Math.min(pw.a,wz); hi=Math.max(pw.a,wz); }
+  ctx.save();
+  ctx.strokeStyle="#f59e0b"; ctx.lineWidth=Math.max(pw.th*s,3);
+  ctx.globalAlpha=0.75;
+  ctx.beginPath();
+  if(pw.horiz){ ctx.moveTo(w2sX(lo),w2sZ(fixed)); ctx.lineTo(w2sX(hi),w2sZ(fixed)); }
+  else{ ctx.moveTo(w2sX(fixed),w2sZ(lo)); ctx.lineTo(w2sX(fixed),w2sZ(hi)); }
+  ctx.stroke();
+  ctx.globalAlpha=1;
+  const len=(hi-lo);
+  const mx=pw.horiz?w2sX((lo+hi)/2):w2sX(fixed);
+  const mz=pw.horiz?w2sZ(fixed):w2sZ((lo+hi)/2);
+  ctx.fillStyle="#fbbf24"; ctx.font="11px monospace";
+  ctx.fillText(`${len.toFixed(2)} m × 2.80 m H`, mx+10, mz-8);
+  ctx.restore();
+}
+function drawSelection2d(){
+  const o=selection.get();
+  if(!o||view2d.drag) return;
+  ctx.save();
+  if(o.type==="wall"){
+    const p=wallEndpoints(o);
+    const pad=8;
+    const x1=w2sX(Math.min(p.x1,p.x2))-pad, z1=w2sZ(Math.min(p.z1,p.z2))-pad;
+    const x2=w2sX(Math.max(p.x1,p.x2))+pad, z2=w2sZ(Math.max(p.z1,p.z2))+pad;
+    ctx.strokeStyle="rgba(245,158,11,0.55)"; ctx.setLineDash([5,4]); ctx.lineWidth=1.4;
+    ctx.strokeRect(x1,z1,x2-x1,z2-z1);
+  }
+  ctx.restore();
+}
+function drawScaleBar2d(W,H,plan){
+  ctx.strokeStyle="rgba(200,220,240,0.8)"; ctx.fillStyle="rgba(200,220,240,0.85)";
+  ctx.lineWidth=1.5; ctx.font="10px sans-serif";
+  if(plan){
+    const s=view2d.scale;
+    let L=1;
+    if(s<15)L=5; else if(s<30)L=2;
+    const px=L*s, x=14, y=H-16;
+    ctx.beginPath();
+    ctx.moveTo(x,y); ctx.lineTo(x+px,y);
+    ctx.moveTo(x,y-4); ctx.lineTo(x,y+4);
+    ctx.moveTo(x+px,y-4); ctx.lineTo(x+px,y+4);
+    ctx.stroke();
+    ctx.fillText(`${L} m`, x+px/2-8, y-6);
+  }else{
+    const m=sliceMap();
+    ctx.fillText("0", m.mLeft-16, m.py(0)+4);
+    ctx.fillText("ceiling 2.80 m", m.mLeft-4, m.py(ROOM_H)-6);
+  }
+}
+
+/* ============================================================
+   §11  2D INTERACTION
+   ============================================================ */
+cv.addEventListener("pointerdown", e=>{
+  const rect=cv.getBoundingClientRect();
+  const px=e.clientX-rect.left, pz=e.clientY-rect.top;
+  const wx=s2wX(px), wz=s2wZ(pz);
+  view2d.mouse={x:px,y:pz,wx,wz,down:true};
+  cv.setPointerCapture(e.pointerId);
+
+  if(view.mode!=="design"){
+    view2d.drag={kind:"pan"};
+    return;
+  }
+  const tool=view2d.tool;
+  if(tool==="select"){
+    const hit=hitTest(wx,wz);
+    if(hit){ selection.id=hit.id; refreshInspector(); beginDrag(hit,wx,wz); }
+    else selection.clear();
+  }
+  else if(tool==="wall"){
+    view2d.pendingWall={horiz:true, fixed:snap(wz), a:snap(wx), th:0.18,
+      startX:snap(wx), startZ:snap(wz), axisLock:null};
+  }
+  else if(tool==="delete"){
+    const hit=hitTest(wx,wz);
+    if(hit){ removeObject(hit.id); selection.clear(); rebuildAll(); toast("Object deleted"); }
+  }
+  else if(tool==="dummy"){
+    world.dummies.push(makeDummy(snap(wx),snap(wz)));
+    rebuildAll();
+    toast("Added 6-ft occupant dummy (1.83 m, 37 °C)");
+  }
+  else if(tool==="window"||tool==="door"){
+    const host=hitWall(wx,wz);
+    if(!host){ toast("Click on a wall to place the "+(tool==="window"?"window":"door"), true); return; }
+    const along=host.horiz? wx : wz;
+    const wlen=tool==="window"?1.2:0.9;
+    const s0=clamp(snap(along-Math.min(host.a,host.b))-wlen/2, 0, Math.max(0,wallLength(host)-wlen));
+    const o= tool==="window"? makeWindow(host.id,s0,1.2,1.0,1.2,0.5)
+                            : makeDoor(host.id,s0,0.9,DOOR_H,0.5,"in+");
+    if(tool==="window") world.windows.push(o); else world.doors.push(o);
+    selection.id=o.id;
+    rebuildAll();
+    toast(`${tool==="window"?"Casement window":"Hinged door"} placed — adjust in Property Inspector`);
+  }
+});
+
+cv.addEventListener("pointermove", e=>{
+  const rect=cv.getBoundingClientRect();
+  const px=e.clientX-rect.left, pz=e.clientY-rect.top;
+  const wx=s2wX(px), wz=s2wZ(pz);
+  const M=view2d.mouse;
+  const dx=px-M.x, dy=pz-M.y;
+  M.x=px;M.y=pz;M.wx=wx;M.wz=wz;
+
+  if(view.mode!=="design"){
+    const d=view2d.drag;
+    if(d&&d.kind==="pan"){ view2d.ox+=dx; view2d.oz+=dy; view2d.needsDraw=true; }
+    handleProbe2d(px,pz);
+    return;
+  }
+  const d=view2d.drag;
+  if(d){
+    if(d.kind==="pan"){ view2d.ox+=dx; view2d.oz+=dy; }
+    else if(d.kind==="dummy"){
+      d.obj.x=snap(wx); d.obj.z=snap(wz);
+      solver.geomDirty=true; refreshInspector();
+    }
+    else if(d.kind==="wallMove"){
+      const w=d.obj;
+      if(w.horiz) w.fixed=snap(wz); else w.fixed=snap(wx);
+      solver.geomDirty=true; refreshInspector();
+    }
+    else if(d.kind==="wallResize"){
+      const w=d.obj;
+      const v=snap(w.horiz?wx:wz);
+      if(d.end==="a") w.a=v; else w.b=v;
+      if(w.b<w.a){ const t=w.a; w.a=w.b; w.b=t; d.end=(d.end==="a")?"b":"a"; }
+      solver.geomDirty=true; refreshInspector();
+    }
+    else if(d.kind==="openSlide"){
+      const o=d.obj, host=hostOf(o); if(!host) return;
+      const span=openingSpan(host,o.s,o.w);
+      const c=span.horiz?wx:wz;
+      const lo=Math.min(span.x1??span.z1,span.x2??span.z2);
+      const hi=Math.max(span.x1??span.z1,span.x2??span.z2);
+      o.open=clamp((c-lo)/Math.max(hi-lo,1e-6),0,1);
+      solver.geomDirty=true; refreshInspector();
+    }
+    else if(d.kind==="openMove"){
+      const o=d.obj, host=hostOf(o); if(!host) return;
+      const c=host.horiz?wx:wz;
+      const base=Math.min(host.a,host.b);
+      o.s=clamp(snap(c-o.w/2-base), 0, Math.max(0,wallLength(host)-o.w));
+      solver.geomDirty=true; refreshInspector();
+    }
+    view2d.needsDraw=true;
+    return;
+  }
+  if(view2d.pendingWall){
+    const pw=view2d.pendingWall;
+    if(pw.axisLock===null){
+      const ddx=Math.abs(wx-pw.startX), ddz=Math.abs(wz-pw.startZ);
+      if(ddx>0.6||ddz>0.6) pw.axisLock=ddx>ddz?"x":"z";
+    }
+    if(pw.axisLock==="x"){
+      pw.horiz=true;
+      pw.fixed=snapNear(pw.startZ,collectWallCoords().zs);
+      pw.a=snapNear(pw.startX,collectWallCoords().xs);
+    }else if(pw.axisLock==="z"){
+      pw.horiz=false;
+      pw.fixed=snapNear(pw.startX,collectWallCoords().xs);
+      pw.a=snapNear(pw.startZ,collectWallCoords().zs);
+    }
+    view2d.needsDraw=true;
+  }
+  const hit=hitTest(wx,wz);
+  cv.style.cursor=hit?"pointer":(view2d.tool==="select"?"default":"crosshair");
+  updateStatusHint(wx,wz,hit);
+});
+
+cv.addEventListener("pointerup", ()=>{
+  const {wx,wz}=view2d.mouse;
+  const pw=view2d.pendingWall;
+  if(pw&&view2d.tool==="wall"&&pw.axisLock){
+    const hi=pw.horiz?snap(wx):snap(wz);
+    if(Math.abs(hi-pw.a)>=0.5){
+      const w=makeWall(pw.horiz,pw.fixed,Math.min(pw.a,hi),Math.max(pw.a,hi),0.18);
+      world.walls.push(w);
+      selection.id=w.id;
+      rebuildAll();
+      toast(`Wall added — ${Math.abs(hi-pw.a).toFixed(2)} m × 2.80 m high`);
+    }
+  }
+  view2d.pendingWall=null;
+  view2d.drag=null;
+  view2d.mouse.down=false;
+  view2d.needsDraw=true;
+  refreshInspector();
+});
+cv.addEventListener("pointerleave", hideProbe);
+cv.addEventListener("wheel", e=>{
+  e.preventDefault();
+  const rect=cv.getBoundingClientRect();
+  const px=e.clientX-rect.left, pz=e.clientY-rect.top;
+  if(view.mode==="sim"&&!isPlanView()){ return; }   // fixed-fit section view
+  const wx=s2wX(px), wz=s2wZ(pz);
+  const f=Math.exp(-e.deltaY*0.0012);
+  view2d.scale=clamp(view2d.scale*f,6,220);
+  view2d.ox=px-wx*view2d.scale;
+  view2d.oz=pz-wz*view2d.scale;
+  view2d.needsDraw=true;
+},{passive:false});
+cv.addEventListener("dblclick", e=>{
+  if(view.mode!=="design") return;
+  const rect=cv.getBoundingClientRect();
+  const hit=hitTest(s2wX(e.clientX-rect.left), s2wZ(e.clientY-rect.top));
+  if(hit){ selection.id=hit.id; refreshInspector(); }
+});
+
+function beginDrag(hit,wx,wz){
+  const s=view2d.scale;
+  if(hit.type==="dummy"){ view2d.drag={kind:"dummy",obj:hit}; return; }
+  if(hit.type==="wall"){
+    const p=wallEndpoints(hit);
+    const tol=12/s;
+    const e1={x:p.x1,z:p.z1}, e2={x:p.x2,z:p.z2};
+    if(Math.hypot(wx-e1.x,wz-e1.z)<tol){ view2d.drag={kind:"wallResize",obj:hit,end:hit.a<=hit.b?"a":"b"}; return; }
+    if(Math.hypot(wx-e2.x,wz-e2.z)<tol){ view2d.drag={kind:"wallResize",obj:hit,end:hit.a<=hit.b?"b":"a"}; return; }
+    view2d.drag={kind:"wallMove",obj:hit};
+    return;
+  }
+  const host=hostOf(hit);
+  if(!host){ view2d.drag={kind:"pan"}; return; }
+  const span=openingSpan(host,hit.s,hit.w);
+  const c=span.horiz?wx:wz;
+  const lo=Math.min(span.x1??span.z1,span.x2??span.z2), hi=Math.max(span.x1??span.z1,span.x2??span.z2);
+  if(c>hi-0.28*Math.max(hi-lo,0.4)) view2d.drag={kind:"openSlide",obj:hit};
+  else view2d.drag={kind:"openMove",obj:hit};
+}
+
+/* ---- probe tooltip (simulation mode) ---- */
+function handleProbe2d(px,pz){
+  if(view.mode!=="sim"||!solver.built){ hideProbe(); return; }
+  let x,y,z;
+  if(isPlanView()){
+    x=s2wX(px); z=s2wZ(pz);
+    y=clamp(view.slicePos*ROOM_H,0.02,ROOM_H-0.02);
+  }else{
+    const m=sliceMap();
+    const u=m.wu(px), yy=clamp(m.wy(pz),0.02,ROOM_H-0.02);
+    if(m.kind==="front"){ x=u; y=yy; z=solver.z0+view.slicePos*solver.nz*solver.dz; }
+    else{ z=u; y=yy; x=solver.x0+view.slicePos*solver.nx*solver.dx; }
+  }
+  const pr=probePoint(x,y,z);
+  const tip=$id("probeTip");
+  if(!pr){ hideProbe(); return; }
+  tip.style.display="block";
+  tip.style.left=Math.min(px+16, window.innerWidth-190)+"px";
+  tip.style.top=(pz+14)+"px";
+  const spd=Math.hypot(pr.u,pr.v,pr.w);
+  tip.innerHTML=`<div class="pt">CFD PROBE</div>
+    <div class="pr"><span>x,y,z</span><b>${fmt(x,2)}, ${fmt(y,2)}, ${fmt(z,2)}</b></div>
+    <div class="pr"><span>T</span><b>${fmt(pr.T,2)} °C</b></div>
+    <div class="pr"><span>|u|</span><b>${fmt(spd,3)} m/s</b></div>
+    <div class="pr"><span>u,v,w</span><b>${fmt(pr.u,2)}, ${fmt(pr.v,2)}, ${fmt(pr.w,2)}</b></div>
+    <div class="pr"><span>p</span><b>${fmt(pr.p,3)} Pa</b></div>
+    ${pr.solid?'<div class="pr"><span>state</span><b style="color:#f87171">SOLID</b></div>':''}`;
+}
+function hideProbe(){ const t=$id("probeTip"); if(t) t.style.display="none"; }
+
+function updateStatusHint(wx,wz,hit){
+  const el=$id("statHint");
+  if(view.mode==="design"){
+    const hints={
+      select:"Drag objects to move · wall ends resize · opening right-edge sets open angle · wheel = zoom",
+      wall:"Drag to draw a wall (axis auto-locks, snaps to 0.25 m + existing ends) · height fixed 2.80 m",
+      window:"Click a wall to install a casement window · set sill & angle in inspector",
+      door:"Click a wall to install a hinged door (90° swing) · drag its right edge to swing",
+      dummy:"Click floor to place a 1.83 m / 37 °C occupant emitting 90 W",
+      delete:"Click any object to remove it",
+    };
+    el.textContent=`${hints[view2d.tool]||""}  ·  cursor ${wx.toFixed(2)}, ${wz.toFixed(2)} m`;
+  }else{
+    el.textContent=`Hover = CFD probe · drag = pan · wheel = zoom · slice: ${view.sliceMode} @ ${(view.slicePos*100).toFixed(0)}%`;
+  }
+}
+
+
+/* ============================================================
+   §12  3D VIEW — Three.js volumetric orbit scene
+   ============================================================ */
+let THREE=null, renderer3=null, scene3=null, cam3=null, controls3=null;
+const v3 = { ready:false, builtGeomKey:"", particles:null, particleData:null,
+             sliceMesh:null, sliceTex:null, sliceCanvas:null, raycaster:null };
+
+async function init3d(){
+  if(v3.ready) return true;
+  try{
+    THREE = await import("three");
+    const {OrbitControls} = await import("three/addons/controls/OrbitControls.js");
+    const cnv=$id("c3d");
+    renderer3=new THREE.WebGLRenderer({canvas:cnv, antialias:true, alpha:false});
+    renderer3.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer3.setClearColor(0x0a0f16);
+    scene3=new THREE.Scene();
+    scene3.fog=new THREE.Fog(0x0a0f16, 30, 90);
+    cam3=new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+    cam3.position.set(14,10,14);
+    controls3=new OrbitControls(cam3, cnv);
+    controls3.enableDamping=true;
+    controls3.dampingFactor=0.08;
+    controls3.maxPolarAngle=Math.PI*0.52;
+    controls3.minDistance=3;
+    controls3.maxDistance=80;
+    // lights
+    scene3.add(new THREE.AmbientLight(0x8fb4d8, 0.55));
+    const sun=new THREE.DirectionalLight(0xfff2dd, 0.9);
+    sun.position.set(18,26,10);
+    scene3.add(sun);
+    const fill=new THREE.DirectionalLight(0x88b8ff, 0.28);
+    fill.position.set(-12,10,-14);
+    scene3.add(fill);
+    // ground grid
+    const grid=new THREE.GridHelper(60, 60, 0x2c4a6e, 0x17273c);
+    grid.position.y=0.001;
+    scene3.add(grid);
+    // ground plane
+    const gnd=new THREE.Mesh(new THREE.PlaneGeometry(60,60),
+      new THREE.MeshStandardMaterial({color:0x0e1622, roughness:0.95, metalness:0}));
+    gnd.rotation.x=-Math.PI/2;
+    gnd.position.y=-0.002;
+    scene3.add(gnd);
+    v3.raycaster=new THREE.Raycaster();
+    v3.ready=true;
+    resize3d();
+    return true;
+  }catch(err){
+    const e=$id("webglErr");
+    e.style.display="flex";
+    e.innerHTML=`<div><b style="color:#f87171">3D view unavailable</b><br>
+      ${String(err).replace(/[<>]/g,"")} <br><br>
+      The 2D Plan view and full CFD solver remain functional.<br>
+      (Three.js loaded from CDN — check network access.)</div>`;
+    return false;
+  }
+}
+function resize3d(){
+  if(!v3.ready) return;
+  const r=$id("view3d").getBoundingClientRect();
+  if(r.width<4||r.height<4) return;
+  renderer3.setSize(r.width,r.height,false);
+  cam3.aspect=r.width/r.height;
+  cam3.updateProjectionMatrix();
+}
+
+/* ---------- build / rebuild 3D geometry ---------- */
+function rebuild3dGeometry(){
+  if(!v3.ready) return;
+  // clear previous building group
+  if(v3.group){ scene3.remove(v3.group); disposeGroup(v3.group); }
+  const g=new THREE.Group();
+  v3.group=g;
+
+  // walls
+  const wallMat=new THREE.MeshStandardMaterial({color:0xb6c4d6, roughness:0.85, metalness:0.05,
+    transparent:true, opacity:0.94, side:THREE.DoubleSide});
+  const wallSelMat=new THREE.MeshStandardMaterial({color:0xf59e0b, roughness:0.7, transparent:true, opacity:0.97});
+  for(const w of world.walls){
+    const lo=Math.min(w.a,w.b), len=Math.abs(w.b-w.a);
+    if(len<0.05) continue;
+    const geom=new THREE.BoxGeometry(w.horiz?len:w.th, ROOM_H, w.horiz?w.th:len);
+    const mesh=new THREE.Mesh(geom, selection.id===w.id?wallSelMat:wallMat);
+    mesh.position.set(
+      w.horiz?(lo+len/2):w.fixed,
+      ROOM_H/2,
+      w.horiz?w.fixed:(lo+len/2));
+    mesh.userData={id:w.id, type:"wall"};
+    g.add(mesh);
+  }
+
+  // windows: frame + rotating casement sashes
+  const frameMat=new THREE.MeshStandardMaterial({color:0x7dd3fc, roughness:0.3, metalness:0.4,
+    transparent:true, opacity:0.55});
+  const sashMat=new THREE.MeshStandardMaterial({color:0xbfe8ff, roughness:0.2, metalness:0.5,
+    transparent:true, opacity:0.8});
+  const glassMat=new THREE.MeshStandardMaterial({color:0x9adcff, roughness:0.05, metalness:0.1,
+    transparent:true, opacity:0.16});
+  for(const o of world.windows){
+    const host=hostOf(o); if(!host) continue;
+    const span=openingSpan(host,o.s,o.w);
+    const L=Math.abs((span.x1??span.z1)-(span.x2??span.z2));
+    if(L<0.05) continue;
+    const grp=new THREE.Group();
+    // frame box
+    const frame=new THREE.Mesh(new THREE.BoxGeometry(
+      span.horiz?L:host.th, o.h, span.horiz?host.th:L), glassMat);
+    frame.position.y=o.y0+o.h/2;
+    grp.add(frame);
+    const edg=new THREE.LineSegments(
+      new THREE.EdgesGeometry(frame.geometry),
+      new THREE.LineBasicMaterial({color:selection.id===o.id?0xfbbf24:0x7dd3fc}));
+    edg.position.copy(frame.position);
+    grp.add(edg);
+    // two casement sashes hinged at center post, rotated by θ = open × 90°
+    const th=o.open*Math.PI/2;
+    for(const dir of [-1,1]){
+      const sash=new THREE.Mesh(new THREE.BoxGeometry(L/2, o.h*0.94, 0.03), sashMat);
+      const pivot=new THREE.Group();
+      pivot.position.set(dir*L/2*(span.horiz?1:0)*0 + (span.horiz? dir*L/2 : 0),
+                         o.y0+o.h/2,
+                         span.horiz? 0 : dir*L/2);
+      sash.position.set(-dir*L/4, 0, 0);
+      pivot.rotation.y=dir*th*(span.horiz?1:-1);
+      // hinge sign flips for Z-walls so sashes swing out of the frame plane
+      if(!span.horiz){ sash.rotation.y=Math.PI/2; sash.position.set(0,0,dir*L/4); }
+      pivot.add(sash);
+      grp.add(pivot);
+    }
+    grp.position.set(span.horiz?Math.min(span.x1,span.x2):span.x, 0,
+                     span.horiz?span.z:Math.min(span.z1,span.z2));
+    grp.userData={id:o.id, type:"window"};
+    g.add(grp);
+  }
+
+  // doors: frame + swing arc + leaf
+  const doorMat=new THREE.MeshStandardMaterial({color:0xd9a066, roughness:0.65});
+  const arcMat=new THREE.LineBasicMaterial({color:0xfca5a5, transparent:true, opacity:0.65});
+  for(const o of world.doors){
+    const host=hostOf(o); if(!host) continue;
+    const span=openingSpan(host,o.s,o.w);
+    const L=Math.abs((span.x1??span.z1)-(span.x2??span.z2));
+    if(L<0.05) continue;
+    const grp=new THREE.Group();
+    const th=o.open*Math.PI/2;
+    const inward=o.swing.startsWith("in")?-1:1;
+    const leaf=new THREE.Mesh(new THREE.BoxGeometry(L, o.h, 0.05), doorMat);
+    const pivot=new THREE.Group();
+    pivot.position.y=0;
+    leaf.position.set(L/2, o.h/2, 0);
+    pivot.add(leaf);
+    // swing arc (quarter circle at floor level)
+    const arcPts=[];
+    for(let a=0;a<=24;a++){
+      const t=a/24*th;
+      arcPts.push(new THREE.Vector3(Math.cos(t)*L, 0.02, Math.sin(t)*L*inward));
+    }
+    const arc=new THREE.Line(new THREE.BufferGeometry().setFromPoints(arcPts), arcMat);
+    grp.add(arc);
+    pivot.rotation.y = -inward*th*(span.horiz?1:1);
+    grp.add(pivot);
+    grp.position.set(span.horiz?Math.min(span.x1,span.x2):span.x, 0,
+                     span.horiz?span.z:Math.min(span.z1,span.z2));
+    if(!span.horiz) grp.rotation.y=Math.PI/2;
+    grp.userData={id:o.id, type:"door"};
+    g.add(grp);
+  }
+
+  // occupants: capsule mannequin + heat halo
+  const bodyMat=new THREE.MeshStandardMaterial({color:0xdbe6f2, roughness:0.6});
+  const selMat3=new THREE.MeshStandardMaterial({color:0xfbbf24, roughness:0.5});
+  for(const m of world.dummies){
+    const grp=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.CapsuleGeometry(0.16, DUMMY_H-0.5, 6, 14),
+      selection.id===m.id?selMat3:bodyMat);
+    body.position.y=DUMMY_H/2;
+    grp.add(body);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 12), body.material);
+    head.position.y=DUMMY_H-0.1;
+    grp.add(head);
+    const halo=new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10),
+      new THREE.MeshBasicMaterial({color:0xf97316, transparent:true, opacity:0.14}));
+    halo.position.y=DUMMY_H*0.55;
+    grp.add(halo);
+    grp.position.set(m.x, 0, m.z);
+    grp.userData={id:m.id, type:"dummy"};
+    g.add(grp);
+  }
+
+  scene3.add(g);
+  v3.builtGeomKey = geomKey();
+}
+function disposeGroup(g){
+  g.traverse(o=>{
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); }
+  });
+}
+function geomKey(){
+  return JSON.stringify(exportBlueprint());
+}
+
+/* ---------- 3D slice plane with live texture ---------- */
+function updateSlice3d(){
+  if(!v3.ready||!view.slicePlane3d||!solver.built){ if(v3.sliceMesh) v3.sliceMesh.visible=false; return; }
+  const S=solver;
+  const sg=sliceGrid(view.sliceMode, view.slicePos);
+  if(!sg) return;
+  const nx=sg.w, nz=sg.h;
+  if(!v3.sliceCanvas){ v3.sliceCanvas=document.createElement("canvas"); v3.sliceTex=null; }
+  if(v3.sliceCanvas.width!==nx||v3.sliceCanvas.height!==nz){
+    v3.sliceCanvas.width=nx; v3.sliceCanvas.height=nz;
+    if(v3.sliceTex) v3.sliceTex.dispose();
+    v3.sliceTex=new THREE.CanvasTexture(v3.sliceCanvas);
+    v3.sliceTex.minFilter=THREE.LinearFilter;
+    v3.sliceTex.magFilter=THREE.LinearFilter;
+  }
+  const c2=v3.sliceCanvas.getContext("2d");
+  const img=c2.createImageData(nx,nz);
+  const lut=fieldLut && fieldKey.startsWith(view.cmap) ? fieldLut : (()=>{ const L=[]; for(let i=0;i<256;i++)L.push(cmapRGB(view.cmap,i/255)); return L; })();
+  let vmin=1e9,vmax=-1e9;
+  const vals=new Float32Array(nx*nz);
+  for(let b=0;b<nz;b++) for(let a=0;a<nx;a++){
+    const c=sg.cell(a,b);
+    let v=NaN;
+    if(!c.solid){
+      v = view.quantity==="T"? c.T : view.quantity==="p"? c.p : Math.hypot(c.u,c.v);
+    }
+    if(view.quantity==="vort"&&!c.solid) v=0;
+    vals[a+nx*b]=v;
+    if(!isNaN(v)){ if(v<vmin)vmin=v; if(v>vmax)vmax=v; }
+  }
+  if(view.quantity==="T"){ vmin=Math.min(env.Tamb-2,vmin); vmax=Math.max(env.Tamb+3,vmax,DUMMY_T); }
+  if(vmax-vmin<1e-6) vmax=vmin+1e-6;
+  for(let n=0;n<nx*nz;n++){
+    const v=vals[n], o=n*4;
+    if(isNaN(v)){ img.data[o]=20;img.data[o+1]=27;img.data[o+2]=38;img.data[o+3]=200; continue; }
+    const cc=lut[clamp(Math.round((v-vmin)/(vmax-vmin)*255),0,255)];
+    img.data[o]=cc[0];img.data[o+1]=cc[1];img.data[o+2]=cc[2];img.data[o+3]=215;
+  }
+  c2.putImageData(img,0,0);
+  if(v3.sliceTex) v3.sliceTex.needsUpdate=true;
+
+  // geometry per slice mode (plane through domain, y up)
+  const wx0=S.x0, wx1=S.x0+S.nx*S.dx;
+  const wz0=S.z0, wz1=S.z0+S.nz*S.dz;
+  if(!v3.sliceMesh){
+    v3.sliceMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({map:v3.sliceTex, transparent:true, opacity:0.9, side:THREE.DoubleSide, depthWrite:false}));
+    scene3.add(v3.sliceMesh);
+  }
+  v3.sliceMesh.material.map=v3.sliceTex;
+  v3.sliceMesh.visible=true;
+  const m=v3.sliceMesh;
+  if(view.sliceMode==="top"){
+    const y=clamp(view.slicePos,0,1)*ROOM_H*0.999;
+    m.scale.set(wx1-wx0, wz1-wz0, 1);
+    m.rotation.set(-Math.PI/2, 0, 0);
+    m.position.set((wx0+wx1)/2, y, (wz0+wz1)/2);
+    // canvas rows = z → texture V flipped for the rotated plane
+    v3.sliceTex.flipY=true;
+  }else if(view.sliceMode==="front"){
+    const z=wz0+view.slicePos*(wz1-wz0);
+    m.scale.set(wx1-wx0, ROOM_H, 1);
+    m.rotation.set(0,0,0);
+    m.position.set((wx0+wx1)/2, ROOM_H/2, z);
+    v3.sliceTex.flipY=false;
+  }else{
+    const x=wx0+view.slicePos*(wx1-wx0);
+    m.scale.set(wz1-wz0, ROOM_H, 1);
+    m.rotation.set(0,Math.PI/2,0);
+    m.position.set(x, ROOM_H/2, (wz0+wz1)/2);
+    v3.sliceTex.flipY=false;
+  }
+}
+
+/* ---------- 3D particles advected by the flow ---------- */
+const PART_N=1400;
+function initParticles(){
+  if(!v3.ready||v3.particles) return;
+  const S=solver;
+  const pos=new Float32Array(PART_N*3);
+  const col=new Float32Array(PART_N*3);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col,3));
+  const mat=new THREE.PointsMaterial({size:0.055, vertexColors:true, transparent:true, opacity:0.9, depthWrite:false});
+  v3.particles=new THREE.Points(geo,mat);
+  scene3.add(v3.particles);
+  v3.particleData=[];
+  for(let i=0;i<PART_N;i++) v3.particleData.push({x:0,y:-1,z:0,life:0});
+}
+function respawnParticle(p){
+  const S=solver;
+  // seed at inflow faces + random interior
+  const r=Math.random();
+  const wind=ablWind(0.5+Math.random()*ROOM_H);
+  if(env.Uref>0.2 && r<0.6){
+    const a=rad(env.az);
+    if(Math.cos(a)>0.1){ p.x=S.x0+0.1; p.z=S.z0+Math.random()*S.nz*S.dz; }
+    else if(Math.cos(a)<-0.1){ p.x=S.x0+S.nx*S.dx-0.1; p.z=S.z0+Math.random()*S.nz*S.dz; }
+    else if(Math.sin(a)>0.1){ p.x=S.x0+Math.random()*S.nx*S.dx; p.z=S.z0+0.1; }
+    else{ p.x=S.x0+Math.random()*S.nx*S.dx; p.z=S.z0+S.nz*S.dz-0.1; }
+  }else{
+    p.x=S.x0+Math.random()*S.nx*S.dx;
+    p.z=S.z0+Math.random()*S.nz*S.dz;
+  }
+  p.y=0.15+Math.random()*(ROOM_H-0.3);
+  p.life=2+Math.random()*6;
+}
+function updateParticles(dt){
+  if(!v3.ready||!v3.particles||!view.particles||!solver.built){ if(v3.particles) v3.particles.visible=false; return; }
+  const S=solver;
+  v3.particles.visible=true;
+  const pos=v3.particles.geometry.attributes.position.array;
+  const col=v3.particles.geometry.attributes.color.array;
+  let vmin=env.Tamb-1, vmax=Math.max(env.Tamb+4, DUMMY_T);
+  for(let i=0;i<PART_N;i++){
+    const p=v3.particleData[i];
+    p.life-=dt;
+    const pr=probePoint(p.x,p.y,p.z);
+    if(!pr||pr.solid||p.life<=0||p.x<S.x0||p.x>S.x0+S.nx*S.dx||p.z<S.z0||p.z>S.z0+S.nz*S.dz||p.y<0.02||p.y>ROOM_H-0.02){
+      respawnParticle(p);
+      continue;
+    }
+    // RK2-ish integration
+    const spd=Math.hypot(pr.u,pr.v,pr.w);
+    const h=Math.min(dt*2.5, 0.35/Math.max(spd,0.1));
+    p.x+=pr.u*h; p.y+=pr.v*h; p.z+=pr.w*h;
+    const t=clamp((pr.T-vmin)/(vmax-vmin),0,1);
+    const c=cmapRGB(view.cmap,t);
+    col[i*3]=c[0]/255; col[i*3+1]=c[1]/255; col[i*3+2]=c[2]/255;
+    pos[i*3]=p.x; pos[i*3+1]=p.y; pos[i*3+2]=p.z;
+  }
+  v3.particles.geometry.attributes.position.needsUpdate=true;
+  v3.particles.geometry.attributes.color.needsUpdate=true;
+}
+
+/* ---------- 3D picking (selection in design mode) ---------- */
+function pick3d(clientX, clientY){
+  if(!v3.ready||!v3.group) return null;
+  const r=$id("c3d").getBoundingClientRect();
+  const nx=((clientX-r.left)/r.width)*2-1;
+  const ny=-((clientY-r.top)/r.height)*2+1;
+  v3.raycaster.setFromCamera(new THREE.Vector2(nx,ny), cam3);
+  const hits=v3.raycaster.intersectObjects(v3.group.children, true);
+  for(const h of hits){
+    let o=h.object;
+    while(o && !o.userData?.id) o=o.parent;
+    if(o&&o.userData?.id) return o.userData;
+  }
+  return null;
+}
+
+/* ---------- render loop for 3D ---------- */
+function render3d(dt){
+  if(!v3.ready) return;
+  controls3.update();
+  const key=geomKey();
+  if(key!==v3.builtGeomKey) rebuild3dGeometry();
+  if(v3.group) v3.group.visible=view.walls3d;
+  updateSlice3d();
+  updateParticles(Math.min(dt,0.05));
+  // wind arrow indicator
+  if(!v3.windArrow){
+    const dir=new THREE.Vector3(1,0,0);
+    const geo=new THREE.ConeGeometry(0.35,1.4,10);
+    geo.rotateX(Math.PI/2);   // point +X before rotation
+    v3.windArrow=new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0xf97316, transparent:true, opacity:0.6}));
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,2.2,8),
+      new THREE.MeshBasicMaterial({color:0xf97316, transparent:true, opacity:0.45}));
+    shaft.rotation.z=Math.PI/2;
+    shaft.position.x=-1.4;
+    v3.windArrow.add(shaft);
+    scene3.add(v3.windArrow);
+  }
+  const S=solver;
+  const cx=(S.built? S.x0+S.nx*S.dx/2 : 5);
+  const cz=(S.built? S.z0+S.nz*S.dz/2 : 5);
+  const R=(S.built? Math.max(S.nx*S.dx,S.nz*S.dz)*0.72 : 7);
+  const a=rad(env.az);
+  v3.windArrow.position.set(cx+R*Math.cos(a), ROOM_H+1.6, cz+R*Math.sin(a));
+  v3.windArrow.rotation.y=-a;
+  v3.windArrow.visible = env.Uref>0.05;
+  renderer3.render(scene3, cam3);
+}
+
+
+/* ============================================================
+   §13  PROPERTY INSPECTOR
+   ============================================================ */
+function refreshInspector(){
+  const panel=$id("propsPanel");
+  const o=selection.get();
+  view2d.needsDraw=true;
+  if(!o){
+    panel.innerHTML=`<div class="noSel">Select an object in <b>Design</b> mode to inspect and edit its properties.<br><br>Walls are extruded to the fixed <b>2.80 m</b> ceiling.</div>`;
+    return;
+  }
+  const num=(label,val,unit,cb,min,max,step=0.05)=>{
+    const id="pp_"+label.replace(/[^a-z0-9]/gi,"");
+    return `<div class="prop"><label>${label}</label><div class="prow">
+      <input type="number" id="${id}" value="${(+val).toFixed(2)}" ${min!==undefined?`min="${min}" max="${max}" step="${step}"`:""}>
+      <span class="unit">${unit||""}</span></div></div>`;
+  };
+  const rng=(label,val,cb,min,max,step)=>{
+    const id="pr_"+label.replace(/[^a-z0-9]/gi,"");
+    return `<div class="prop"><label>${label}</label>
+      <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+  };
+  let html="";
+  if(o.type==="wall"){
+    const len=Math.abs(o.b-o.a).toFixed(2);
+    html=`<div class="objTitle">🧱 Wall <span class="tag">${o.horiz?"ALONG X":"ALONG Z"}</span></div>
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Length ${len} m · Height fixed 2.80 m</div>
+      ${num("Position ("+(o.horiz?"z":"x")+")", o.fixed, "m")}
+      ${num("Start ("+(o.horiz?"x":"z")+")", Math.min(o.a,o.b), "m")}
+      ${num("End ("+(o.horiz?"x":"z")+")", Math.max(o.a,o.b), "m")}
+      ${num("Thickness", o.th, "m", null, 0.08, 0.5, 0.02)}
+      <div class="btnRow"><button class="tbtn warn" id="ppDel">🗑 Delete</button></div>`;
+  }
+  else if(o.type==="window"){
+    const host=hostOf(o);
+    const thDeg=Math.round(o.open*90);
+    html=`<div class="objTitle">🪟 Casement Window <span class="tag">θ=${thDeg}°</span></div>
+      ${host?`<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Host: wall #${host.id} (${host.horiz?"along X":"along Z"})</div>`:""}
+      ${num("Offset along wall", o.s, "m")}
+      ${num("Width", o.w, "m", null, 0.4, 3, 0.05)}
+      ${num("Sill height y₀", o.y0, "m", null, 0, 2.0, 0.05)}
+      ${num("Height", o.h, "m", null, 0.3, 2.2, 0.05)}
+      ${rng("Casement open (θ = open × 90°)", o.open*100, null, 0, 100, 1)}
+      <div class="prop"><label>Open angle</label><div style="font-size:12px;color:#ffd9a0">θ = <b id="ppTheta">${thDeg}°</b> · ${Math.round(o.open*100)}% free area</div></div>
+      <div class="btnRow"><button class="tbtn warn" id="ppDel">🗑 Delete</button></div>`;
+  }
+  else if(o.type==="door"){
+    html=`<div class="objTitle">🚪 Hinged Door <span class="tag">${Math.round(o.open*90)}° SWING</span></div>
+      ${num("Offset along wall", o.s, "m")}
+      ${num("Width", o.w, "m", null, 0.5, 1.6, 0.05)}
+      ${num("Height", o.h, "m", null, 1.6, 2.4, 0.05)}
+      ${rng("Open fraction (90° max)", o.open*100, null, 0, 100, 1)}
+      <div class="prop"><label>Swing direction</label>
+        <select class="inp" id="ppSwing">
+          <option value="in+" ${o.swing==="in+"?"selected":""}>Swing in · left</option>
+          <option value="in-" ${o.swing==="in-"?"selected":""}>Swing in · right</option>
+          <option value="out+" ${o.swing==="out+"?"selected":""}>Swing out · left</option>
+          <option value="out-" ${o.swing==="out-"?"selected":""}>Swing out · right</option>
+        </select></div>
+      <div class="btnRow"><button class="tbtn warn" id="ppDel">🗑 Delete</button></div>`;
+  }
+  else if(o.type==="dummy"){
+    html=`<div class="objTitle">🧍 Occupant Dummy <span class="tag">6 FT</span></div>
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Height 1.83 m · skin 37.0 °C · 90 W sensible heat</div>
+      ${num("Position x", o.x, "m")}
+      ${num("Position z", o.z, "m")}
+      <div class="btnRow"><button class="tbtn warn" id="ppDel">🗑 Delete</button></div>`;
+  }
+  panel.innerHTML=html;
+
+  // wire inputs
+  const bindNum=(id, prop, transform)=>{
+    const el=$id(id);
+    if(!el) return;
+    el.addEventListener("change", ()=>{
+      let v=parseFloat(el.value);
+      if(isNaN(v)) return;
+      if(transform) v=transform(v);
+      if(prop==="s"||prop==="fixed"||prop==="a"||prop==="b"||prop==="x"||prop==="z") v=snap(v);
+      o[prop]=v;
+      solver.geomDirty=true;
+      refreshInspectorSoft();
+      rebuildAll();
+    });
+  };
+  const wire=(prefix, prop)=>{
+    const el=$id(prefix);
+    if(el) el.addEventListener("input", ()=>{
+      o[prop]=parseFloat(el.el!==undefined?0:el.value);
+      o[prop]=parseFloat(el.value);
+      solver.geomDirty=true;
+      refreshInspectorSoft();
+    });
+  };
+  if(o.type==="wall"){
+    bindNum("pp_Positionzorx","fixed");
+    bindNum("pp_Startxorz","a", v=>{ if(v>o.b){o.b=v; return o.a;} return v; });
+    bindNum("pp_Endxorz","b", v=>{ if(v<o.a){o.a=v; return o.b;} return v; });
+    bindNum("pp_Thickness","th", v=>clamp(v,0.08,0.5));
+  }
+  else if(o.type==="window"){
+    bindNum("pp_Offsetalongwall","s", v=>clamp(v,0,Math.max(0,wallLength(hostOf(o))-o.w)));
+    bindNum("pp_Width","w", v=>clamp(v,0.4,3));
+    bindNum("pp_Sillheighty","y0", v=>clamp(v,0,2.0));
+    bindNum("pp_Height","h", v=>clamp(v,0.3,2.2));
+    const r=$id("pr_Casementopenopenx90");
+    if(r) r.addEventListener("input", ()=>{
+      o.open=parseFloat(r.value)/100;
+      solver.geomDirty=true;
+      $id("ppTheta").textContent=Math.round(o.open*90)+"°";
+      view2d.needsDraw=true;
+      updateEnvReadout();
+    });
+  }
+  else if(o.type==="door"){
+    bindNum("pp_Offsetalongwall","s", v=>clamp(v,0,Math.max(0,wallLength(hostOf(o))-o.w)));
+    bindNum("pp_Width","w", v=>clamp(v,0.5,1.6));
+    bindNum("pp_Height","h", v=>clamp(v,1.6,2.4));
+    const r=$id("pr_Openfraction90max");
+    if(r) r.addEventListener("input", ()=>{
+      o.open=parseFloat(r.value)/100;
+      solver.geomDirty=true;
+      view2d.needsDraw=true;
+    });
+    const sw=$id("ppSwing");
+    if(sw) sw.addEventListener("change", ()=>{ o.swing=sw.value; solver.geomDirty=true; view2d.needsDraw=true; });
+  }
+  else if(o.type==="dummy"){
+    bindNum("pp_Positionx","x");
+    bindNum("pp_Positionz","z");
+  }
+  const del=$id("ppDel");
+  if(del) del.addEventListener("click", ()=>{
+    removeObject(o.id);
+    selection.clear();
+    rebuildAll();
+    toast("Object deleted");
+  });
+}
+function refreshInspectorSoft(){
+  view2d.needsDraw=true;
+  const st=modelStats();
+  $id("msWalls").textContent=st.walls;
+  $id("msWins").textContent=st.wins;
+  $id("msDoors").textContent=st.doors;
+  $id("msDum").textContent=st.dummies;
+}
+
+/* ============================================================
+   §14  LEGEND / READOUTS
+   ============================================================ */
+const QTY_LABELS={T:"Temperature (°C)", speed:"Velocity magnitude (m/s)", vort:"Vertical vorticity (1/s)", p:"Pressure (Pa)"};
+function updateLegend(vmin,vmax){
+  const el=$id("legend");
+  el.classList.remove("hidden");
+  $id("legTitle").textContent=QTY_LABELS[view.quantity]||view.quantity;
+  $id("legBar").style.background=cmapGradientCSS(view.cmap);
+  $id("legMin").textContent=fmt(vmin, view.quantity==="T"?1:2);
+  $id("legMax").textContent=fmt(vmax, view.quantity==="T"?1:2);
+  $id("legMid").textContent=fmt((vmin+vmax)/2, view.quantity==="T"?1:2);
+}
+function updateEnvReadout(){
+  const beta=1/(env.Tamb+273.15);
+  $id("envReadout").innerHTML=
+    `β = 1/T₀ = <b>${beta.toExponential(2)} K⁻¹</b> (Boussinesq)<br>`+
+    `ν = <b>1.62×10⁻⁵</b> · α = <b>2.25×10⁻⁵</b> m²/s<br>`+
+    `ν<sub>t</sub>: Smagorinsky Cs=0.12, Pr<sub>t</sub>=0.85<br>`+
+    `U(y)=U<sub>ref</sub>(max(y,0.1)/10)<sup>α</sup> ABL<br>`+
+    `Ceiling: <b>2.80 m</b> · Door leaf: <b>2.10 m</b>`;
+}
+function syncEnvUI(){
+  $id("inTamb").value=env.Tamb; $id("inTambVal").textContent=env.Tamb.toFixed(1)+" °C";
+  $id("inUref").value=env.Uref; $id("inUrefVal").textContent=env.Uref.toFixed(1)+" m/s";
+  $id("inAlpha").value=env.alpha; $id("inAlphaVal").textContent=env.alpha.toFixed(2);
+  $id("inAz").value=env.az; $id("inAzVal").textContent=env.az+"°";
+  $id("azArrow").style.transform=`rotate(${env.az}deg)`;
+  updateEnvReadout();
+}
+
+/* ============================================================
+   §15  REBUILD PIPELINE
+   ============================================================ */
+function rebuildAll(){
+  refreshInspectorSoft();
+  buildGrid();               // rebuilds solver arrays + voxelization + reset
+  if(v3.ready) rebuild3dGeometry();
+  view2d.needsDraw=true;
+  updateSolverInfo();
+}
+
+/* ============================================================
+   §16  MODE / VIEW SWITCHING
+   ============================================================ */
+function setMode(mode){
+  view.mode=mode;
+  const isD=mode==="design";
+  $id("btnModeDesign").classList.toggle("on",isD);
+  $id("btnModeSim").classList.toggle("on",!isD);
+  $id("modeOverlay").textContent=isD?"✏️ DESIGN MODE — GEOMETRY EDITABLE":"🌊 SIMULATION — NAVIER–STOKES + LES LIVE";
+  $id("modeOverlay").className=isD?"design":"sim";
+  $id("toolsSec").style.display=isD?"":"none";
+  $id("propsSec").style.display=isD?"":"none";
+  $id("simInfoSec").style.display=isD?"none":"";
+  $id("vbMode").textContent=isD?"DESIGN":"SIMULATION";
+  if(isD){
+    view.playing=false;
+    updatePlayBtn();
+    $id("legend").classList.add("hidden");
+    hideProbe();
+    if(solver.geomDirty){ buildGrid(); }
+    fitView2d();
+  }else{
+    if(solver.geomDirty||!solver.built) buildGrid();
+    view.playing=true;
+    updatePlayBtn();
+    toast("Simulation live — geometry locked. Switch back to Design to edit.");
+  }
+  view2d.needsDraw=true;
+  updateSolverInfo();
+}
+function setPane(pane){
+  view.pane=pane;
+  $id("btnView2D").classList.toggle("on",pane==="2d");
+  $id("btnView3D").classList.toggle("on",pane==="3d");
+  $id("view2d").classList.toggle("on",pane==="2d");
+  $id("view3d").classList.toggle("on",pane==="3d");
+  $id("sliceBadge").style.display = pane==="2d"&&view.mode==="sim" ? "" : "none";
+  if(pane==="3d"){ init3d().then(ok=>{ if(ok){ resize3d(); rebuild3dGeometry(); initParticles(); } }); }
+  else{ view2d.needsDraw=true; fitView2d(); }
+  requestAnimationFrame(()=>{ resizeCanvas2d(); resize3d(); if(pane==="2d") fitView2d(); });
+}
+function updatePlayBtn(){
+  $id("btnPlay").innerHTML = view.playing? "⏸ <span id='playLabel'>Running</span>" : "▶ <span id='playLabel'>Paused</span>";
+  $id("btnPlay").classList.toggle("accent", view.playing);
+}
+
+/* ============================================================
+   §17  SOLVER INFO PANEL
+   ============================================================ */
+let spsCounter={steps:0, t0:performance.now(), sps:0, msAvg:16};
+function updateSolverInfo(){
+  const S=solver;
+  if(!S.built) return;
+  $id("siTime").textContent=S.t.toFixed(2)+" s";
+  $id("siCells").textContent=`${S.nx}×${S.ny}×${S.nz}`;
+  $id("siFluid").textContent=`${(S.nx*S.ny*S.nz-S.wallCells).toLocaleString()} / ${S.wallCells.toLocaleString()}`;
+  $id("siUmax").textContent=S.umax.toFixed(3)+" m/s";
+  $id("siDt").textContent=S.dt.toFixed(4)+` s (CFL ${S.cfl.toFixed(2)})`;
+  let tmin=1e9,tmax=-1e9;
+  for(let n=0;n<S.T.length;n++){ if(S.T[n]<tmin)tmin=S.T[n]; if(S.T[n]>tmax)tmax=S.T[n]; }
+  $id("siTrange").textContent=`${tmin.toFixed(1)} … ${tmax.toFixed(1)} °C`;
+  $id("statCells").textContent=(S.nx*S.ny*S.nz).toLocaleString();
+  $id("sbVal").textContent = view.sliceMode==="top"
+    ? (view.slicePos*ROOM_H).toFixed(2)
+    : (view.slicePos*100).toFixed(0)+"%";
+}
+function updateSps(steps, ms){
+  const now=performance.now();
+  spsCounter.steps+=steps;
+  if(now-spsCounter.t0>500){
+    spsCounter.sps=spsCounter.steps*1000/(now-spsCounter.t0);
+    spsCounter.steps=0; spsCounter.t0=now;
+    $id("statSps").textContent=Math.round(spsCounter.sps);
+    $id("siRate").textContent=Math.round(spsCounter.sps)+" steps/s";
+    $id("siSteps").textContent=solverCfg.substeps+" × "+(60/Math.max(1,solverCfg.substeps)).toFixed(0)+" fps ≈ "+Math.round(spsCounter.sps)+" total";
+  }
+  spsCounter.msAvg=lerp(spsCounter.msAvg,ms,0.1);
+  $id("statMs").textContent=Math.round(spsCounter.msAvg);
+}
+
+/* ============================================================
+   §18  UI EVENT WIRING
+   ============================================================ */
+function wireUI(){
+  // mode
+  $id("btnModeDesign").addEventListener("click",()=>setMode("design"));
+  $id("btnModeSim").addEventListener("click",()=>setMode("sim"));
+  $id("btnView2D").addEventListener("click",()=>setPane("2d"));
+  $id("btnView3D").addEventListener("click",()=>setPane("3d"));
+  $id("btnPlay").addEventListener("click",()=>{
+    if(view.mode!=="sim"){ setMode("sim"); return; }
+    view.playing=!view.playing;
+    updatePlayBtn();
+  });
+  $id("btnReset").addEventListener("click",()=>{
+    buildGrid();
+    toast("Fields reset to ambient state");
+  });
+  $id("btnVTK").addEventListener("click",exportVTK);
+  $id("btnExport").addEventListener("click",()=>{
+    downloadFile("aerothermal3d_blueprint.json", JSON.stringify(exportBlueprint(),null,2));
+    toast("Blueprint exported (JSON)");
+  });
+  $id("btnImport").addEventListener("click",()=>$id("fileImport").click());
+  $id("fileImport").addEventListener("change", e=>{
+    const f=e.target.files[0];
+    if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{
+        importBlueprint(JSON.parse(rd.result));
+        toast(`Imported: ${world.walls.length} walls, ${world.windows.length} windows, ${world.doors.length} doors, ${world.dummies.length} occupants`);
+        fitView2d();
+      }catch(err){ toast("Import failed: "+err.message, true); }
+    };
+    rd.readAsText(f);
+    e.target.value="";
+  });
+  $id("selPreset").addEventListener("change", e=>{
+    const v=e.target.value;
+    if(v){ loadPreset(v); fitView2d(); e.target.value=""; }
+  });
+
+  // tools
+  document.querySelectorAll(".tool").forEach(t=>{
+    t.addEventListener("click",()=>{
+      document.querySelectorAll(".tool").forEach(x=>x.classList.remove("on"));
+      t.classList.add("on");
+      view2d.tool=t.dataset.tool;
+      view2d.pendingWall=null;
+      cv.style.cursor = view2d.tool==="select"?"default":"crosshair";
+      updateStatusHint(0,0,null);
+    });
+  });
+
+  // environment
+  $id("inTamb").addEventListener("input",e=>{
+    env.Tamb=parseFloat(e.target.value);
+    $id("inTambVal").textContent=env.Tamb.toFixed(1)+" °C";
+    if(solver.built){
+      for(let n=0;n<solver.T.length;n++) if(Math.abs(solver.T[n]-env.Tamb)<1e-6) solver.T[n]=env.Tamb;
+      updateEnvReadout();
+    }
+    updateEnvReadout();
+  });
+  $id("inUref").addEventListener("input",e=>{
+    env.Uref=parseFloat(e.target.value);
+    $id("inUrefVal").textContent=env.Uref.toFixed(1)+" m/s";
+    applyInflow(); updateEnvReadout();
+  });
+  $id("inAlpha").addEventListener("input",e=>{
+    env.alpha=parseFloat(e.target.value);
+    $id("inAlphaVal").textContent=env.alpha.toFixed(2);
+    applyInflow(); updateEnvReadout();
+  });
+  $id("inAz").addEventListener("input",e=>{
+    env.az=parseFloat(e.target.value);
+    $id("inAzVal").textContent=env.az+"°";
+    $id("azArrow").style.transform=`rotate(${env.az}deg)`;
+    applyInflow(); updateEnvReadout();
+  });
+
+  // visualization
+  $id("selQuantity").addEventListener("change",e=>{ view.quantity=e.target.value; view2d.needsDraw=true; });
+  $id("selCmap").addEventListener("change",e=>{ view.cmap=e.target.value; fieldKey=""; view2d.needsDraw=true; });
+  $id("selSliceMode").addEventListener("change",e=>{
+    view.sliceMode=e.target.value;
+    $id("sliceBadge").style.display=view.mode==="sim"?"":"none";
+    updateSliceUI();
+    view2d.needsDraw=true;
+    updateSolverInfo();
+  });
+  $id("inSlice").addEventListener("input",e=>{
+    view.slicePos=parseFloat(e.target.value);
+    updateSliceUI();
+    view2d.needsDraw=true;
+  });
+  const bindChk=(id,fn)=>{ $id(id).addEventListener("change",e=>fn(e.target.checked)); };
+  bindChk("chkGlyphs", v=>{ view.glyphs=v; view2d.needsDraw=true; });
+  bindChk("chkStream", v=>{ view.streamlines=v; view2d.needsDraw=true; });
+  bindChk("chkParts", v=>{ view.particles=v; });
+  bindChk("chkSlicePlane", v=>{ view.slicePlane3d=v; });
+  bindChk("chkWalls3d", v=>{ view.walls3d=v; });
+  $id("inGlyphDens").addEventListener("input",e=>{
+    view.glyphDens=parseInt(e.target.value);
+    $id("inGlyphDensVal").textContent=e.target.value;
+    view2d.needsDraw=true;
+  });
+
+  // solver
+  $id("selRes").addEventListener("change",e=>{
+    solverCfg.dx=parseFloat(e.target.value);
+    buildGrid();
+    toast(`Grid rebuilt at dx=${solverCfg.dx} m — fields reset`);
+  });
+  $id("inSubsteps").addEventListener("input",e=>{
+    solverCfg.substeps=parseInt(e.target.value);
+    $id("inSubstepsVal").textContent=e.target.value;
+  });
+  $id("inPiters").addEventListener("input",e=>{
+    solverCfg.piters=parseInt(e.target.value);
+    $id("inPitersVal").textContent=e.target.value;
+  });
+
+  // 3D canvas picking
+  $id("c3d").addEventListener("pointerdown", e=>{
+    if(view.mode!=="design") return;
+    const hit=pick3d(e.clientX,e.clientY);
+    if(hit){ selection.id=hit.id; refreshInspector(); }
+    else selection.clear();
+  });
+
+  // window resize
+  window.addEventListener("resize",()=>{
+    resizeCanvas2d();
+    resize3d();
+    view2d.needsDraw=true;
+  });
+}
+function updateSliceUI(){
+  const S=solver;
+  $id("inSliceVal").textContent =
+    view.sliceMode==="top" ? (view.slicePos*ROOM_H).toFixed(2)+" m"
+    : (view.slicePos*100).toFixed(0)+"%";
+  $id("sbVal").textContent =
+    view.sliceMode==="top" ? (view.slicePos*ROOM_H).toFixed(2)
+    : (view.slicePos*100).toFixed(0)+"%";
+}
+
+/* ============================================================
+   §19  MAIN LOOP
+   ============================================================ */
+let lastFrame=performance.now();
+function mainLoop(now){
+  const dt=Math.min((now-lastFrame)/1000, 0.1);
+  lastFrame=now;
+  const t0=performance.now();
+
+  let steps=0;
+  if(view.mode==="sim"&&view.playing&&solver.built){
+    for(let i=0;i<solverCfg.substeps;i++){ stepSolver(); steps++; }
+    view2d.needsDraw=true;
+  }
+
+  if(view.pane==="2d"){
+    if(view2d.needsDraw || view.mode==="sim") draw2d();
+  }else{
+    render3d(dt);
+  }
+  if(view.mode==="sim"){
+    updateSolverInfo();
+    updateSps(steps, performance.now()-t0);
+    $id("statTime").textContent=solver.t.toFixed(2);
+    $id("statCfl").textContent=solver.cfl.toFixed(2);
+  }
+  requestAnimationFrame(mainLoop);
+}
+
+/* ============================================================
+   §20  BOOT
+   ============================================================ */
+function boot(){
+  wireUI();
+  syncEnvUI();
+  loadPreset("crossvent");
+  setMode("design");
+  setPane("2d");
+  resizeCanvas2d();
+  fitView2d();
+  updateSliceUI();
+  requestAnimationFrame(mainLoop);
+  toast("Welcome to AeroThermal3D — draw in Design mode, then switch to Simulation");
+}
+/* debug/testing hook (harmless in production) */
+window.__AERO = { view, solver, world, env, solverCfg, selection,
+  stepSolver, buildGrid, voxelize, resetFields, applyInflow, probePoint,
+  sliceGrid, exportBlueprint, importBlueprint, loadPreset, setMode, setPane,
+  view2d, w2sX: (x)=>view2d.ox+x*view2d.scale, w2sZ:(z)=>view2d.oz+z*view2d.scale,
+  hitTest, beginDrag };
+
+boot();
+</script>
+</body>
+</html>
